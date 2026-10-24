@@ -1,0 +1,36 @@
+@* Upstream's document and payment statuses, labelled in French. *@
+<span class="status @Css">@Label</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+
+    private string Label => Status switch
+    {
+        "DRAFT" => Loc.T("Brouillon"),
+        "SENT" => Loc.T("Envoyé"),
+        "VIEWED" => Loc.T("Consulté"),
+        "COMPLETED" => Loc.T("Terminé"),
+        "UNPAID" => Loc.T("Impayé"),
+        "PARTIALLY_PAID" => Loc.T("Partiellement payé"),
+        "PAID" => Loc.T("Payé"),
+        "ACCEPTED" => Loc.T("Accepté"),
+        "REJECTED" => Loc.T("Refusé"),
+        "EXPIRED" => Loc.T("Expiré"),
+        "OPEN" => "Ouvert",
+        "VOID" => Loc.T("Annulé"),
+        "SETTLED" => Loc.T("Réglé"),
+        "PARTIAL" => "Partiel",
+        _ => Status,
+    };
+
+    // Upstream's tones (InvoiceStatusBadge, PaidStatusBadge, EstimateStatusBadge).
+    private string Css => Status switch
+    {
+        "SENT" or "VIEWED" or "OPEN" => "status-blue",
+        "COMPLETED" or "PAID" or "ACCEPTED" or "SETTLED" => "status-green",
+        "UNPAID" => "status-yellow",
+        "PARTIALLY_PAID" or "PARTIAL" => "status-purple",
+        "REJECTED" or "EXPIRED" or "VOID" => "status-red",
+        _ => "status-gray",
+    };
+}

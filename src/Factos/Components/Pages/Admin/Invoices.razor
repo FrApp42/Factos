@@ -1,0 +1,84 @@
+@page "/admin/invoices"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+
+<PageTitle>@Loc.T("Factures · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Factures")</h1>
+    <a class="btn btn-primary" href="admin/invoices/create">@Loc.T("+ Nouvelle facture")</a>
+</div>
+
+<div class="btn-group mb-3" role="group">
+    @foreach (var (value, label) in Filters)
+    {
+        <button class="btn btn-sm @(filter == value ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetFilter(value)">@label</button>
+    }
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucune facture.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Client")</th><th>@Loc.T("Statut")</th><th>@Loc.T("Paiement")</th><th class="money">@Loc.T("Total")</th><th class="money">@Loc.T("Reste dû")</th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/invoices/@r.Invoice.Id/view">@r.Invoice.InvoiceNumber</a>
+                            @if (r.Invoice.Type == CreditNotes.Type) { <span class="status status-purple ms-1">@Loc.T("Note de crédit")</span> }</td>
+                        <td>@Current.Date(r.Invoice.InvoiceDate)</td>
+                        <td>@r.Customer</td>
+                        <td><StatusBadge Status="@r.Invoice.Status" /></td>
+                        <td><StatusBadge Status="@r.Invoice.PaidStatus" /></td>
+                        <td class="money">@Current.Money(r.Invoice.Total, r.Currency)</td>
+                        <td class="money">@Current.Money(r.Invoice.DueAmount, r.Currency)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private static readonly (string, string)[] Filters =
+        [("", "Toutes"), ("DRAFT", Loc.T("Brouillons")), ("DUE", Loc.T("À encaisser")), ("PAID", Loc.T("Payées")), ("CREDIT", Loc.T("Notes de crédit"))];
+
+    private record Row(Invoice Invoice, string Customer, Currency? Currency);
+    private List<Row>? rows;
+    private string filter = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task SetFilter(string value)
+    {
+        filter = value;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        var q = db.Invoices.Where(i => i.CompanyId == Current.Id);
+        q = filter switch
+        {
+            "DRAFT" => q.Where(i => i.Status == Sales.Draft),
+            "DUE" => q.Where(i => i.Type == "INVOICE" && i.Status != Sales.Draft && i.PaidStatus != Sales.Paid),
+            "PAID" => q.Where(i => i.Type == "INVOICE" && i.PaidStatus == Sales.Paid),
+            "CREDIT" => q.Where(i => i.Type == CreditNotes.Type),
+            _ => q,
+        };
+        var invoices = await q.OrderByDescending(i => i.InvoiceDate).ThenByDescending(i => i.Id).ToListAsync();
+        var customers = await db.Customers.Where(c => c.CompanyId == Current.Id).ToDictionaryAsync(c => c.Id, c => c.Name);
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        rows = invoices.Select(i => new Row(i,
+            i.CustomerId is { } c ? customers.GetValueOrDefault(c, "") : "",
+            i.CurrencyId is { } cur ? currencies.GetValueOrDefault(cur) : Current.Currency)).ToList();
+    }
+}

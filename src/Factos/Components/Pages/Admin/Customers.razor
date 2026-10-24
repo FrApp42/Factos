@@ -1,0 +1,89 @@
+@page "/admin/customers"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Clients · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Clients")</h1>
+    <a class="btn btn-primary" href="admin/customers/create">@Loc.T("+ Nouveau client")</a>
+</div>
+
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<input class="form-control mb-3" placeholder="@Loc.T("Rechercher (nom, e-mail, téléphone)…")" @bind="search" @bind:event="oninput" @bind:after="Load" />
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucun client.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Nom")</th><th>@Loc.T("Contact")</th><th>E-mail</th><th>@Loc.T("Téléphone")</th><th class="money">@Loc.T("Reste dû")</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/customers/@r.Customer.Id/edit">@r.Customer.Name</a></td>
+                        <td>@r.Customer.ContactName</td>
+                        <td>@r.Customer.Email</td>
+                        <td>@r.Customer.Phone</td>
+                        <td class="money">@Current.Money(r.Due, r.Currency)</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="admin/invoices/create?customer=@r.Customer.Id">@Loc.T("Facturer")</a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Customer)">@Loc.T("Supprimer")</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(Customer Customer, long Due, Currency? Currency);
+    private List<Row>? rows;
+    private string search = "";
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        var q = db.Customers.Where(c => c.CompanyId == Current.Id);
+        if (!string.IsNullOrWhiteSpace(search))
+            q = q.Where(c => c.Name.Contains(search) || (c.Email != null && c.Email.Contains(search)) || (c.Phone != null && c.Phone.Contains(search)));
+        var customers = await q.OrderBy(c => c.Name).ToListAsync();
+        var ids = customers.Select(c => (long?)c.Id).ToList();
+        var due = await db.Invoices.Where(i => i.CompanyId == Current.Id && ids.Contains(i.CustomerId) && i.Status != Sales.Draft)
+            .GroupBy(i => i.CustomerId).Select(g => new { g.Key, Due = g.Sum(i => i.DueAmount) }).ToDictionaryAsync(x => x.Key!.Value, x => x.Due);
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        rows = customers.Select(c => new Row(c, due.GetValueOrDefault(c.Id),
+            c.CurrencyId is { } cid ? currencies.GetValueOrDefault(cid) : Current.Currency)).ToList();
+    }
+
+    private async Task Delete(Customer customer)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.F("Supprimer le client « {0} » ?", customer.Name)))
+            return;
+        await using var db = Dbs.Create();
+        var id = customer.Id;
+        if (await db.Invoices.AnyAsync(i => i.CustomerId == id) || await db.Estimates.AnyAsync(e => e.CustomerId == id) || await db.Payments.AnyAsync(p => p.CustomerId == id))
+        {
+            error = Loc.T("Ce client a des factures, devis ou paiements : supprimez-les d'abord.");
+            return;
+        }
+        await db.Addresses.Where(a => a.CustomerId == id).ExecuteDeleteAsync();
+        var mailOption = DocumentMailer.CustomerOption(id);
+        await db.CompanySettings.Where(s => s.CompanyId == Current.Id && s.Option == mailOption).ExecuteDeleteAsync();
+        await db.Customers.Where(c => c.Id == id && c.CompanyId == Current.Id).ExecuteDeleteAsync();
+        error = null;
+        await Load();
+    }
+}

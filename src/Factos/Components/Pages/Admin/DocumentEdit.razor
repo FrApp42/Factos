@@ -1,0 +1,26 @@
+@page "/admin/invoices/create"
+@page "/admin/invoices/{Id:int}/edit"
+@page "/admin/estimates/create"
+@page "/admin/estimates/{Id:int}/edit"
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.F("{0} · Factos", Title)</PageTitle>
+
+<div class="page-head"><h1>@Title</h1></div>
+
+<DocumentEditor Kind="@Kind" Id="Id" CustomerId="Customer" />
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "customer")] public long? Customer { get; set; }
+
+    private string Kind => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("admin/invoices") ? "invoice" : "estimate";
+
+    private string Title => (Kind, Id) switch
+    {
+        ("invoice", null) => Loc.T("Nouvelle facture"),
+        ("invoice", _) => Loc.T("Modifier la facture"),
+        (_, null) => Loc.T("Nouveau devis"),
+        _ => Loc.T("Modifier le devis"),
+    };
+}

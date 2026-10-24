@@ -1,0 +1,177 @@
+@* Document lines and totals, shared by invoices, estimates and recurring invoices.
+   Amounts are typed in major units and kept in cents; every change re-runs
+   DocumentDraft.Recalculate(), the port of upstream's form maths. *@
+@inject CurrentCompany Current
+
+<div class="card mb-3">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="min-width:16rem">@Loc.T("Article")</th>
+                    <th style="width:7rem">@Loc.T("Quantité")</th>
+                    <th style="width:9rem">@Loc.T("Prix")</th>
+                    @if (Draft.DiscountPerItem) { <th style="width:11rem">@Loc.T("Remise")</th> }
+                    @if (Draft.TaxPerItem) { <th style="min-width:12rem">@Loc.T("Taxes")</th> }
+                    <th class="money" style="width:9rem">@Loc.T("Montant")</th>
+                    <th style="width:3rem"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in Draft.Items)
+                {
+                    <tr>
+                        <td>
+                            <select class="form-select form-select-sm mb-1" aria-label="@Loc.T("Article du catalogue")" @onchange="e => PickItem(line, e)">
+                                <option value="">@Loc.T("Article du catalogue…")</option>
+                                @foreach (var i in Items)
+                                {
+                                    <option value="@i.Id" selected="@(line.ItemId == i.Id)">@i.Name</option>
+                                }
+                            </select>
+                            <input class="form-control form-control-sm mb-1" placeholder="@Loc.T("Nom *")" @bind="line.Name" @bind:after="Recalc" />
+                            <textarea class="form-control form-control-sm" rows="1" placeholder="@Loc.T("Description")" @bind="line.Description"></textarea>
+                        </td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" aria-label="@Loc.T("Quantité")" @bind="line.Quantity" @bind:after="Recalc" /></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" aria-label="@Loc.T("Prix")" value="@Money.ToMajor(line.Price)" @onchange="e => { line.Price = Cents(e); Recalc(); }" /></td>
+                        @if (Draft.DiscountPerItem)
+                        {
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.01" class="form-control" aria-label="@Loc.T("Remise de la ligne")" @bind="line.Discount" @bind:after="Recalc" />
+                                    <select class="form-select" style="max-width:4.5rem" aria-label="@Loc.T("Type de remise")" @bind="line.DiscountType" @bind:after="Recalc">
+                                        <option value="fixed">@Current.Currency?.Symbol</option>
+                                        <option value="percentage">%</option>
+                                    </select>
+                                </div>
+                            </td>
+                        }
+                        @if (Draft.TaxPerItem)
+                        {
+                            <td>
+                                @foreach (var t in line.Taxes.ToList())
+                                {
+                                    <span class="badge text-bg-light border me-1">@t.Name @Current.Money(t.Amount, Currency)
+                                        <button type="button" class="btn-close btn-close-sm ms-1" style="font-size:.55rem" @onclick="() => { line.Taxes.Remove(t); Recalc(); }"></button>
+                                    </span>
+                                }
+                                <select class="form-select form-select-sm mt-1" @onchange="e => AddTax(line.Taxes, e)">
+                                    <option value="">@Loc.T("+ Taxe")</option>
+                                    @foreach (var tt in TaxTypes.Where(tt => line.Taxes.All(x => x.TaxTypeId != tt.Id)))
+                                    {
+                                        <option value="@tt.Id">@tt.Name</option>
+                                    }
+                                </select>
+                            </td>
+                        }
+                        <td class="money">@Current.Money(line.Total, Currency)</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger" title="@Loc.T("Supprimer la ligne")" @onclick="() => { Draft.Items.Remove(line); Recalc(); }">×</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body pt-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddLine">@Loc.T("+ Ajouter une ligne")</button>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">@ChildContent</div>
+    <div class="col-md-6">
+        <div class="card"><div class="card-body">
+            <div class="d-flex justify-content-between mb-2"><span>Sous-total</span><span class="money">@Current.Money(Draft.SubTotal, Currency)</span></div>
+            @if (!Draft.DiscountPerItem)
+            {
+                <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                    <span>@Loc.T("Remise")</span>
+                    <div class="input-group input-group-sm" style="max-width:12rem">
+                        <input type="number" step="0.01" class="form-control" aria-label="@Loc.T("Remise")" @bind="Draft.Discount" @bind:after="Recalc" />
+                        <select class="form-select" style="max-width:4.5rem" aria-label="@Loc.T("Type de remise")" @bind="Draft.DiscountType" @bind:after="Recalc">
+                            <option value="fixed">@Current.Currency?.Symbol</option>
+                            <option value="percentage">%</option>
+                        </select>
+                    </div>
+                    <span class="money">- @Current.Money(Draft.DiscountVal, Currency)</span>
+                </div>
+            }
+            @if (!Draft.TaxPerItem)
+            {
+                @foreach (var t in Draft.Taxes.ToList())
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>@t.Name @(t.CalculationType == "fixed" ? "" : $"({t.Percent?.ToString("0.##")} %)")
+                            <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1" @onclick="() => { Draft.Taxes.Remove(t); Recalc(); }">retirer</button>
+                        </span>
+                        <span class="money">@Current.Money(t.Amount, Currency)</span>
+                    </div>
+                }
+                <select class="form-select form-select-sm mb-2" @onchange="e => AddTax(Draft.Taxes, e)">
+                    <option value="">@Loc.T("+ Ajouter une taxe")</option>
+                    @foreach (var tt in TaxTypes.Where(tt => Draft.Taxes.All(x => x.TaxTypeId != tt.Id)))
+                    {
+                        <option value="@tt.Id">@tt.Name</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <div class="d-flex justify-content-between mb-2"><span>@Loc.T("Taxes")</span><span class="money">@Current.Money(Draft.Totals().Tax, Currency)</span></div>
+            }
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" role="switch" type="checkbox" id="taxIncluded" @bind="Draft.TaxIncluded" @bind:after="Recalc" />
+                <label class="form-check-label" for="taxIncluded">@Loc.T("Prix TTC (taxes incluses)")</label>
+            </div>
+            <hr />
+            <div class="d-flex justify-content-between fw-bold fs-5"><span>@Loc.T("Total")</span><span class="money">@Current.Money(Draft.Totals().Total, Currency)</span></div>
+        </div></div>
+    </div>
+</div>
+
+
+@code {
+    [Parameter, EditorRequired] public DocumentDraft Draft { get; set; } = default!;
+    [Parameter] public Currency? Currency { get; set; }
+    [Parameter] public List<Item> Items { get; set; } = [];
+    [Parameter] public List<TaxType> TaxTypes { get; set; } = [];
+    /// Left-hand column next to the totals (the notes field).
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnParametersSet() => Recalc();
+
+    private void PickItem(DraftItem line, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var id) || Items.FirstOrDefault(i => i.Id == id) is not { } item)
+            return;
+        line.ItemId = item.Id;
+        line.Name = item.Name;
+        line.Description = item.Description;
+        line.Price = item.Price;
+        Recalc();
+    }
+
+    private void AddTax(List<DraftTax> taxes, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var id) || TaxTypes.FirstOrDefault(t => t.Id == id) is not { } type)
+            return;
+        taxes.Add(new DraftTax
+        {
+            TaxTypeId = type.Id, Name = type.Name, Percent = type.Percent, CalculationType = type.CalculationType,
+            FixedAmount = type.FixedAmount, Compound = type.CompoundTax != 0,
+        });
+        Recalc();
+    }
+
+    private void AddLine()
+    {
+        Draft.Items.Add(new DraftItem());
+        Recalc();
+    }
+
+    private void Recalc() => Draft.Recalculate();
+
+    private static long Cents(ChangeEventArgs e)
+        => decimal.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v)
+            ? Money.ToCents(v)
+            : 0;
+}

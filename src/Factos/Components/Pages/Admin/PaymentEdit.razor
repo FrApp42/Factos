@@ -1,0 +1,207 @@
+@page "/admin/payments/create"
+@page "/admin/payments/{Id:long}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Paiement · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? Loc.T("Nouveau paiement") : Loc.T("Modifier le paiement"))</h1></div>
+
+@if (form is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Client *")</span>
+            <select class="form-select" value="@form.CustomerId" @onchange="CustomerChanged">
+                <option value="">@Loc.T("— Choisir —")</option>
+                @foreach (var c in customers) { <option value="@c.Id">@c.Name</option> }
+            </select></label>
+    </div>
+    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Date *")</span><InputDate class="form-control" @bind-Value="form.PaymentDate" /></label></div>
+    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Numéro *")</span><InputText class="form-control" @bind-Value="form.Number" /></label></div>
+    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Montant ({0}) *", currency?.Code)</span>
+        <input type="number" step="0.01" class="form-control" value="@amount" @onchange="AmountChanged" /></label></div>
+    <div class="col-md-2">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Moyen de paiement")</span>
+            <InputSelect class="form-select" @bind-Value="form.PaymentMethodId">
+                <option value="">—</option>
+                @foreach (var m in methods) { <option value="@m.Id">@m.Name</option> }
+            </InputSelect></label>
+    </div>
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span><InputTextArea class="form-control" rows="2" @bind-Value="form.Notes" /></label></div>
+</div></div>
+
+@if (form.CustomerId is not null)
+{
+    <div class="card mb-3">
+        <div class="card-body pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h2 class="h6 m-0">@Loc.T("Factures réglées par ce paiement")</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AutoAllocate" disabled="@(rows.Count == 0)">@Loc.T("Répartir automatiquement")</button>
+        </div>
+        @if (rows.Count == 0)
+        {
+            <p class="card-body text-muted mb-0">@Loc.T("Aucune facture à régler pour ce client : le paiement restera en avoir.")</p>
+        }
+        else
+        {
+            <div class="table-responsive"><table class="table align-middle mb-0">
+                <thead><tr><th>@Loc.T("Facture")</th><th>@Loc.T("Date")</th><th class="money">@Loc.T("Total")</th><th class="money">@Loc.T("Reste à payer")</th><th style="width:11rem">@Loc.T("Montant affecté")</th></tr></thead>
+                <tbody>
+                    @foreach (var r in rows)
+                    {
+                        <tr>
+                            <td>@r.Number</td>
+                            <td>@Current.Date(r.Date)</td>
+                            <td class="money">@Current.Money(r.Total, currency)</td>
+                            <td class="money">@Current.Money(r.Available, currency)</td>
+                            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" aria-label="Montant affecté à @r.Number"
+                                       value="@Money.ToMajor(r.Allocated)" @onchange="e => { r.Allocated = Cents(e); }" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+        <div class="card-body d-flex gap-4 flex-wrap">
+            <span>@Loc.T("Affecté :") <strong>@Current.Money(rows.Sum(r => r.Allocated), currency)</strong></span>
+            <span class="@(Unallocated < 0 ? "text-danger" : "")">@Loc.T("Non affecté (avoir client) :") <strong>@Current.Money(Unallocated, currency)</strong></span>
+        </div>
+    </div>
+}
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" disabled="@saving" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="@(Id is null ? "admin/payments" : $"admin/payments/{Id}/view")">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "invoice")] public int? Invoice { get; set; }
+
+    private sealed class Row
+    {
+        public int InvoiceId { get; init; }
+        public string Number { get; init; } = "";
+        public DateTime Date { get; init; }
+        public long Total { get; init; }
+        /// What this payment may still put on the invoice (its due amount + what this payment already pays).
+        public long Available { get; init; }
+        public long Allocated { get; set; }
+    }
+
+    private PaymentForm? form;
+    private decimal amount;
+    private List<Customer> customers = [];
+    private List<PaymentMethod> methods = [];
+    private List<Row> rows = [];
+    private Currency? currency;
+    private string? error;
+    private bool saving;
+
+    private long Unallocated => Money.ToCents(amount) - rows.Sum(r => r.Allocated);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        currency = Current.Currency;
+        await using (var db = Dbs.Create())
+        {
+            customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+            methods = await db.PaymentMethods.Where(m => m.CompanyId == Current.Id).OrderBy(m => m.Name).ToListAsync();
+        }
+
+        if (Id is { } id)
+        {
+            form = await Sales.LoadPaymentAsync(Current.Id, id);
+            amount = Money.ToMajor(form.Amount);
+            await LoadInvoicesAsync();
+            return;
+        }
+
+        form = new PaymentForm();
+        if (Invoice is { } invoiceId)
+        {
+            await using var db = Dbs.Create();
+            if (await db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId && i.CompanyId == Current.Id) is { } invoice)
+            {
+                form.CustomerId = invoice.CustomerId;
+                amount = Money.ToMajor(invoice.DueAmount);
+                await LoadInvoicesAsync();
+                if (rows.FirstOrDefault(r => r.InvoiceId == invoiceId) is { } row)
+                    row.Allocated = Math.Min(row.Available, invoice.DueAmount);
+            }
+        }
+        form.Number = await Sales.NextNumberAsync(Current.Id, "payment", form.CustomerId);
+    }
+
+    private async Task CustomerChanged(ChangeEventArgs e)
+    {
+        form!.CustomerId = long.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        form.Allocations.Clear();
+        await LoadInvoicesAsync();
+        if (Id is null)
+            form.Number = await Sales.NextNumberAsync(Current.Id, "payment", form.CustomerId);
+    }
+
+    private void AmountChanged(ChangeEventArgs e)
+        => amount = decimal.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+    /// The customer's payable invoices: issued, not credit notes, with something left to pay
+    /// — plus any this payment already settles.
+    private async Task LoadInvoicesAsync()
+    {
+        await using var db = Dbs.Create();
+        var currencyId = customers.FirstOrDefault(c => c.Id == form!.CustomerId)?.CurrencyId;
+        currency = currencyId is { } cid ? await db.Currencies.FindAsync(cid) : Current.Currency;
+        var mine = form!.Allocations.ToDictionary(a => a.InvoiceId, a => a.Amount);
+        var mineIds = mine.Keys.ToList();
+        var invoices = await db.Invoices
+            .Where(i => i.CompanyId == Current.Id && i.CustomerId == form.CustomerId && i.Type == "INVOICE" && i.Status != Sales.Draft
+                        && (i.DueAmount > 0 || mineIds.Contains(i.Id)))
+            .OrderBy(i => i.InvoiceDate).ThenBy(i => i.Id).ToListAsync();
+        rows = invoices.Select(i => new Row
+        {
+            InvoiceId = i.Id, Number = i.InvoiceNumber, Date = i.InvoiceDate, Total = i.Total,
+            Available = i.DueAmount + mine.GetValueOrDefault(i.Id),
+            Allocated = mine.GetValueOrDefault(i.Id),
+        }).ToList();
+    }
+
+    /// Oldest invoices first, each up to what it still owes, until the payment is used up.
+    private void AutoAllocate()
+    {
+        var left = Money.ToCents(amount);
+        foreach (var row in rows)
+        {
+            row.Allocated = Math.Min(row.Available, Math.Max(0, left));
+            left -= row.Allocated;
+        }
+    }
+
+    private static long Cents(ChangeEventArgs e)
+        => decimal.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var v)
+            ? Money.ToCents(v) : 0;
+
+    private async Task Save()
+    {
+        error = null;
+        saving = true;
+        try
+        {
+            form!.Amount = Money.ToCents(amount);
+            form.Allocations = rows.Where(r => r.Allocated > 0).Select(r => new Allocation { InvoiceId = r.InvoiceId, Amount = r.Allocated }).ToList();
+            var id = await Sales.SavePaymentAsync(Current.Id, Current.UserId, form);
+            Navigation.NavigateTo($"admin/payments/{id}/view");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

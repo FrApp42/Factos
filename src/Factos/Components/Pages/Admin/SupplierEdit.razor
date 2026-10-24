@@ -1,0 +1,79 @@
+@page "/admin/suppliers/create"
+@page "/admin/suppliers/{Id:long}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Purchases Purchases
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Fournisseur · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? Loc.T("Nouveau fournisseur") : Loc.T("Modifier le fournisseur"))</h1></div>
+
+@if (supplier is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span><InputText class="form-control" @bind-Value="supplier.Name" /></label></div>
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Contact")</span><InputText class="form-control" @bind-Value="supplier.ContactName" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">E-mail</span><InputText class="form-control" type="email" @bind-Value="supplier.Email" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Téléphone")</span><InputText class="form-control" @bind-Value="supplier.Phone" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Site web")</span><InputText class="form-control" @bind-Value="supplier.Website" /></label></div>
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Devise *")</span>
+        <InputSelect class="form-select" @bind-Value="supplier.CurrencyId">
+            @foreach (var c in currencies) { <option value="@c.Id">@c.Code — @c.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("N° de TVA / fiscal")</span><InputText class="form-control" @bind-Value="supplier.TaxId" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Délai de paiement (jours)")</span><InputNumber class="form-control" @bind-Value="supplier.PaymentTerms" /></label></div>
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Catégorie de dépense par défaut")</span>
+        <InputSelect class="form-select" @bind-Value="supplier.ExpenseCategoryId">
+            <option value="">—</option>
+            @foreach (var c in categories) { <option value="@c.Id">@c.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check form-switch"><InputCheckbox class="form-check-input" role="switch" id="enabled" @bind-Value="supplier.Enabled" /><label class="form-check-label" for="enabled">@Loc.T("Actif")</label></div>
+    </div>
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span><InputTextArea class="form-control" rows="3" @bind-Value="supplier.Notes" /></label></div>
+</div></div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="@(Id is null ? "admin/suppliers" : $"admin/suppliers/{Id}")">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private Supplier? supplier;
+    private List<Currency> currencies = [];
+    private List<ExpenseCategory> categories = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        currencies = await db.Currencies.OrderBy(c => c.Code).ToListAsync();
+        categories = await db.ExpenseCategories.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+        supplier = Id is { } id
+            ? await db.Suppliers.AsNoTracking().SingleAsync(s => s.Id == id && s.CompanyId == Current.Id)
+            : new Supplier { CurrencyId = Current.Currency?.Id ?? currencies.First().Id };
+    }
+
+    private async Task Save()
+    {
+        error = null;
+        try
+        {
+            var id = await Purchases.SaveSupplierAsync(Current.Id, Current.UserId, supplier!);
+            Navigation.NavigateTo($"admin/suppliers/{id}");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

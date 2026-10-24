@@ -1,0 +1,2652 @@
+{
+  "abilities": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "entity_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "entity_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "only_owned": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "options": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "scope": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "title": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "addresses": {
+    "address_street_1": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "address_street_2": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "city": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "country_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "fax": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "phone": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "state": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "user_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "zip": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "assigned_roles": {
+    "entity_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "entity_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "restricted_to_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "restricted_to_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "role_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "scope": {
+      "clr": "int?",
+      "nullable": true
+    }
+  },
+  "bill_items": {
+    "base_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "bill_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "discount_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_val": {
+      "clr": "long",
+      "nullable": false
+    },
+    "expense_category_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "price": {
+      "clr": "long",
+      "nullable": false
+    },
+    "quantity": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "source_bill_item_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "taxes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "bills": {
+    "base_due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "document_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "due_date": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "financial_locked_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "reference": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "source_bill_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "source_expense_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_snapshot": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_included": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "void_reason": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "voided_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "companies": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "logo": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "owner_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "slug": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "tax_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "unique_hash": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "vat_id": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "company_settings": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "option": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "value": {
+      "clr": "string",
+      "nullable": false
+    }
+  },
+  "countries": {
+    "code": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "phonecode": {
+      "clr": "int",
+      "nullable": false
+    }
+  },
+  "currencies": {
+    "code": {
+      "clr": "string",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "decimal_separator": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "precision": {
+      "clr": "int",
+      "nullable": false
+    },
+    "swap_currency_symbol": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "symbol": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "thousand_separator": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "custom_field_values": {
+    "boolean_answer": {
+      "clr": "bool?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "custom_field_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "custom_field_valuable_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "custom_field_valuable_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "date_answer": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "date_time_answer": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "number_answer": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "string_answer": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "time_answer": {
+      "clr": "TimeOnly?",
+      "nullable": true
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "custom_fields": {
+    "boolean_answer": {
+      "clr": "bool?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "date_answer": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "date_time_answer": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "is_required": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "label": {
+      "clr": "string",
+      "nullable": false
+    },
+    "model_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "number_answer": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "options": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "order": {
+      "clr": "long",
+      "nullable": false
+    },
+    "placeholder": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "placement": {
+      "clr": "string",
+      "nullable": false
+    },
+    "slug": {
+      "clr": "string",
+      "nullable": false
+    },
+    "string_answer": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "time_answer": {
+      "clr": "TimeOnly?",
+      "nullable": true
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "validation": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "customers": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "company_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "contact_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "email": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "enable_portal": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "facebook_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "github_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "google_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "password": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "phone": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "prefix": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "remember_token": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "tax_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "website": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "email_logs": {
+    "body": {
+      "clr": "string",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "from": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "mailable_id": {
+      "clr": "string",
+      "nullable": false
+    },
+    "mailable_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "subject": {
+      "clr": "string",
+      "nullable": false
+    },
+    "to": {
+      "clr": "string",
+      "nullable": false
+    },
+    "token": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "estimate_items": {
+    "base_discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_price": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_tax": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "discount": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "discount_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "estimate_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "price": {
+      "clr": "long",
+      "nullable": false
+    },
+    "quantity": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "unit_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "estimates": {
+    "base_discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_sub_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_tax": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "customer_sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "discount": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "discount_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "estimate_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "estimate_number": {
+      "clr": "string",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "expiry_date": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "reference_number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sales_tax_address_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sales_tax_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_included": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "tax_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "template_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "unique_hash": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "exchange_rate_logs": {
+    "base_currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "exchange_rate_providers": {
+    "active": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "currencies": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "driver": {
+      "clr": "string",
+      "nullable": false
+    },
+    "driver_config": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "key": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "expense_categories": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "expenses": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "attachment_receipt": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "base_amount": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "expense_category_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "expense_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "expense_number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "payment_method_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "supplier_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "file_disks": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "credentials": {
+      "clr": "string",
+      "nullable": false
+    },
+    "driver": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "set_as_default": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "invoice_items": {
+    "base_discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_price": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_tax": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "discount": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "discount_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_val": {
+      "clr": "long",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "invoice_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "price": {
+      "clr": "long",
+      "nullable": false
+    },
+    "quantity": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "recurring_invoice_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "source_invoice_item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "unit_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "invoices": {
+    "base_discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_due_amount": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_sub_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_tax": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "base_total": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "credit_reason": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "customer_sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "discount": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "discount_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "due_date": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "invoice_date": {
+      "clr": "DateTime",
+      "nullable": false
+    },
+    "invoice_number": {
+      "clr": "string",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "overdue": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "paid_status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "recurring_invoice_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "reference_number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "related_invoice_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "sales_tax_address_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sales_tax_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sent": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_included": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "tax_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "template_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "unique_hash": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "viewed": {
+      "clr": "bool",
+      "nullable": false
+    }
+  },
+  "items": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "price": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_per_item": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "unit_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "notes": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "is_default": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string",
+      "nullable": false
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "payment_allocations": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "invoice_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "payment_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "payment_methods": {
+    "active": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "driver": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "settings": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "use_test_env": {
+      "clr": "bool",
+      "nullable": false
+    }
+  },
+  "payments": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "customer_sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "payment_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "payment_method_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "payment_number": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "transaction_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "unique_hash": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "permissions": {
+    "ability_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "entity_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "entity_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "forbidden": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "scope": {
+      "clr": "int?",
+      "nullable": true
+    }
+  },
+  "recurring_invoices": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "customer_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "discount": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "discount_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "discount_val": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "frequency": {
+      "clr": "string",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "last_error": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "limit_by": {
+      "clr": "string",
+      "nullable": false
+    },
+    "limit_count": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "limit_date": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "next_invoice_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "notify_creator": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "sales_tax_address_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sales_tax_type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "send_automatically": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "starts_at": {
+      "clr": "DateTime",
+      "nullable": false
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_included": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "tax_per_item": {
+      "clr": "string",
+      "nullable": false
+    },
+    "template_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "roles": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "level": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "scope": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "title": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "settings": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "option": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "value": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "supplier_credit_allocations": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "bill_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_credit_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "supplier_credit_items": {
+    "base_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "discount_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "discount_val": {
+      "clr": "long",
+      "nullable": false
+    },
+    "expense_category_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "price": {
+      "clr": "long",
+      "nullable": false
+    },
+    "quantity": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "source_bill_item_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_credit_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "taxes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "supplier_credits": {
+    "base_due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "document_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "due_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "due_date": {
+      "clr": "DateOnly?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "financial_locked_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "reference": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "source_bill_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "source_expense_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "sub_total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_snapshot": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "tax": {
+      "clr": "long",
+      "nullable": false
+    },
+    "tax_included": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "total": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "void_reason": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "voided_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "supplier_payment_allocations": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "bill_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_payment_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "supplier_payments": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "payment_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "payment_method_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "reference": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "supplier_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "void_reason": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "voided_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "supplier_refunds": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "exchange_rate": {
+      "clr": "decimal",
+      "nullable": false
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "number": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "payment_date": {
+      "clr": "DateOnly",
+      "nullable": false
+    },
+    "payment_method_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "reference": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "sequence_number": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "supplier_credit_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "supplier_id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "supplier_payment_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "void_reason": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "voided_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "suppliers": {
+    "addresses": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "company_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "contact_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "email": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "enabled": {
+      "clr": "bool",
+      "nullable": false
+    },
+    "expense_category_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "notes": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "payment_terms": {
+      "clr": "int",
+      "nullable": false
+    },
+    "phone": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "tax_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "website": {
+      "clr": "string?",
+      "nullable": true
+    }
+  },
+  "tax_types": {
+    "calculation_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "collective_tax": {
+      "clr": "byte",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "compound_tax": {
+      "clr": "byte",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "description": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "fixed_amount": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "percent": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "transaction_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "taxes": {
+    "amount": {
+      "clr": "long",
+      "nullable": false
+    },
+    "base_amount": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "calculation_type": {
+      "clr": "string",
+      "nullable": false
+    },
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "compound_tax": {
+      "clr": "byte",
+      "nullable": false
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "estimate_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "estimate_item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "exchange_rate": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "expense_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "fixed_amount": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "invoice_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "invoice_item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "item_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "percent": {
+      "clr": "decimal?",
+      "nullable": true
+    },
+    "recurring_invoice_id": {
+      "clr": "long?",
+      "nullable": true
+    },
+    "tax_type_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "transactions": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "invoice_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "status": {
+      "clr": "string",
+      "nullable": false
+    },
+    "transaction_date": {
+      "clr": "DateTime",
+      "nullable": false
+    },
+    "transaction_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "type": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "unique_hash": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "units": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    }
+  },
+  "user_company": {
+    "company_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "user_id": {
+      "clr": "int?",
+      "nullable": true
+    }
+  },
+  "user_settings": {
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "long",
+      "nullable": false
+    },
+    "key": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "user_id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "value": {
+      "clr": "string",
+      "nullable": false
+    }
+  },
+  "users": {
+    "company_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "contact_name": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "created_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "creator_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "currency_id": {
+      "clr": "int?",
+      "nullable": true
+    },
+    "email": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "enable_portal": {
+      "clr": "bool?",
+      "nullable": true
+    },
+    "facebook_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "github_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "google_id": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "id": {
+      "clr": "int",
+      "nullable": false
+    },
+    "name": {
+      "clr": "string",
+      "nullable": false
+    },
+    "phone": {
+      "clr": "string?",
+      "nullable": true
+    },
+    "role": {
+      "clr": "string",
+      "nullable": false
+    },
+    "updated_at": {
+      "clr": "DateTime?",
+      "nullable": true
+    },
+    "website": {
+      "clr": "string?",
+      "nullable": true
+    }
+  }
+}

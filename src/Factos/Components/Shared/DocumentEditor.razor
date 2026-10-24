@@ -1,0 +1,166 @@
+@* Invoice / estimate form. Amounts are typed in major units and kept in cents;
+   every change re-runs DocumentDraft.Recalculate(), the port of upstream's form maths. *@
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject NavigationManager Navigation
+
+@if (form is null)
+{
+    <p>@Loc.T("Chargement…")</p>
+    return;
+}
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body row g-3">
+        <div class="col-md-4">
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Client *")</span>
+            <select class="form-select" value="@form.CustomerId" @onchange="CustomerChanged">
+                <option value="">@Loc.T("— Choisir —")</option>
+                @foreach (var c in customers)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select></label>
+        </div>
+        <div class="col-md-2">
+            <label class="d-block mb-0"><span class="form-label d-block">@(IsInvoice ? Loc.T("Date de facture") : Loc.T("Date du devis")) *</span>
+            <InputDate class="form-control" @bind-Value="form.Date" /></label>
+        </div>
+        <div class="col-md-2">
+            <label class="d-block mb-0"><span class="form-label d-block">@(IsInvoice ? Loc.T("Échéance") : "Expiration")</span>
+            <InputDate class="form-control" @bind-Value="form.DueDate" /></label>
+        </div>
+        <div class="col-md-2">
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Numéro *")</span>
+            <InputText class="form-control" @bind-Value="form.Number" /></label>
+        </div>
+        <div class="col-md-2">
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Référence")</span>
+            <InputText class="form-control" @bind-Value="form.ReferenceNumber" /></label>
+        </div>
+        @if (templates.Count > 1)
+        {
+            <div class="col-md-3">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Modèle PDF")</span>
+                <select class="form-select" @bind="form.TemplateName">
+                    @if (!templates.Any(t => t.Name == form.TemplateName)) { <option value="@form.TemplateName">@Loc.F("{0} (par défaut)", templates[0].Name)</option> }
+                    @foreach (var t in templates) { <option value="@t.Name">@t.Name</option> }
+                </select></label>
+            </div>
+        }
+        @if (customerCurrency is not null && Current.Currency is not null && customerCurrency.Id != Current.Currency.Id)
+        {
+            <div class="col-md-3">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Taux de change (1 {0} = ? {1}) *", customerCurrency.Code, Current.Currency.Code)</span>
+                <InputNumber class="form-control" @bind-Value="form.ExchangeRate" step="0.000001" /></label>
+            </div>
+        }
+    </div>
+</div>
+
+<DocumentLines Draft="draft" Currency="customerCurrency" Items="items" TaxTypes="taxTypes">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span>
+        <InputTextArea class="form-control" rows="5" @bind-Value="form.Notes" /></label>
+</DocumentLines>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" disabled="@saving" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="@ListUrl">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    /// "invoice" or "estimate".
+    [Parameter, EditorRequired] public string Kind { get; set; } = "invoice";
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public long? CustomerId { get; set; }
+
+    private bool IsInvoice => Kind == "invoice";
+    private string ListUrl => IsInvoice ? "admin/invoices" : "admin/estimates";
+
+    private DocumentForm? form;
+    private DocumentDraft draft = new();
+    private List<Customer> customers = [];
+    private List<Item> items = [];
+    private List<TaxType> taxTypes = [];
+    private List<DocumentTemplate> templates = [];
+    private Currency? customerCurrency;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using (var db = Dbs.Create())
+        {
+            customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+            items = await db.Items.Where(i => i.CompanyId == Current.Id).OrderBy(i => i.Name).ToListAsync();
+            taxTypes = await db.TaxTypes.Where(t => t.CompanyId == Current.Id && t.TransactionType == "sales").OrderBy(t => t.Name).ToListAsync();
+        }
+
+        templates = await DocumentTemplates.LoadAsync(Dbs, Current.Id);
+        if (Id is { } id)
+        {
+            form = await Sales.LoadAsync(Current.Id, Kind, id);
+        }
+        else
+        {
+            form = new DocumentForm { CustomerId = CustomerId };
+            form.Draft.TaxPerItem = Current.Setting("tax_per_item") == "YES";
+            form.Draft.DiscountPerItem = Current.Setting("discount_per_item") == "YES";
+            var prefix = IsInvoice ? "invoice_due_date" : "estimate_expiry_date";
+            var auto = Current.Setting(IsInvoice ? "invoice_set_due_date_automatically" : "estimate_set_expiry_date_automatically") == "YES";
+            if (auto && int.TryParse(Current.Setting(prefix + "_days"), out var days))
+                form.DueDate = form.Date.AddDays(days);
+            form.Number = await Sales.NextNumberAsync(Current.Id, Kind, CustomerId);
+            form.Draft.Items.Add(new DraftItem());
+        }
+        draft = form.Draft;
+        await LoadCustomerCurrencyAsync();
+        Recalc();
+    }
+
+    private async Task CustomerChanged(ChangeEventArgs e)
+    {
+        form!.CustomerId = long.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadCustomerCurrencyAsync();
+        if (Id is null)
+            form.Number = await Sales.NextNumberAsync(Current.Id, Kind, form.CustomerId);
+    }
+
+    private async Task LoadCustomerCurrencyAsync()
+    {
+        var currencyId = customers.FirstOrDefault(c => c.Id == form!.CustomerId)?.CurrencyId;
+        await using var db = Dbs.Create();
+        customerCurrency = currencyId is { } cid ? await db.Currencies.FindAsync(cid) : Current.Currency;
+    }
+
+    private void Recalc() => draft.Recalculate();
+
+    private async Task Save()
+    {
+        error = null;
+        saving = true;
+        try
+        {
+            Recalc();
+            var id = IsInvoice
+                ? await Sales.SaveInvoiceAsync(Current.Id, Current.UserId, form!)
+                : await Sales.SaveEstimateAsync(Current.Id, Current.UserId, form!);
+            Navigation.NavigateTo($"{ListUrl}/{id}/view");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

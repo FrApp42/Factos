@@ -1,0 +1,193 @@
+@page "/admin/profile"
+@* Static form posts: changing the password renews the auth cookie, which needs a real
+   HTTP response, not an interactive circuit. *@
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> Users
+@inject SignInManager<ApplicationUser> SignIn
+@inject AppDbFactory Dbs
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Mon profil · Factos")</PageTitle>
+
+<div class="page-head"><h1>@Loc.T("Mon profil")</h1></div>
+
+@if (message is not null) { <div class="alert alert-success">@message</div> }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h2 class="h6 mb-3">@Loc.T("Informations")</h2>
+            <EditForm Model="ProfileInput" FormName="profile" method="post" OnValidSubmit="SaveProfile">
+                <DataAnnotationsValidator />
+                <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Nom *")</span>
+                    <InputText class="form-control" @bind-Value="ProfileInput.Name" autocomplete="name" /></label>
+                <ValidationMessage For="() => ProfileInput.Name" class="text-danger" />
+                <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("E-mail *")</span>
+                    <InputText class="form-control" type="email" @bind-Value="ProfileInput.Email" autocomplete="email" /></label>
+                <ValidationMessage For="() => ProfileInput.Email" class="text-danger" />
+                <button class="btn btn-primary" type="submit">@Loc.T("Enregistrer")</button>
+            </EditForm>
+        </div></div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h2 class="h6 mb-3">@Loc.T("Mot de passe")</h2>
+            <EditForm Model="PasswordInput" FormName="password" method="post" OnSubmit="ChangePassword">
+                <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Mot de passe actuel")</span>
+                    <InputText class="form-control" type="password" @bind-Value="PasswordInput.Current" autocomplete="current-password" /></label>
+                <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Nouveau mot de passe (8 caractères min.)")</span>
+                    <InputText class="form-control" type="password" @bind-Value="PasswordInput.New" autocomplete="new-password" /></label>
+                <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Confirmation")</span>
+                    <InputText class="form-control" type="password" @bind-Value="PasswordInput.Confirm" autocomplete="new-password" /></label>
+                <button class="btn btn-primary" type="submit">@Loc.T("Changer le mot de passe")</button>
+            </EditForm>
+        </div></div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h2 class="h6 mb-1">@Loc.T("Thème")</h2>
+            <p class="text-muted small mb-3">@Loc.T("Le mode clair ou sombre suit celui de votre système.")</p>
+            <EditForm Model="ThemeInput" FormName="theme" method="post" OnSubmit="SaveTheme">
+                <InputRadioGroup @bind-Value="ThemeInput.Theme">
+                    <div class="d-grid gap-2 mb-3">
+                        <label class="form-check d-flex align-items-center gap-2 m-0">
+                            <InputRadio class="form-check-input m-0" Value="@("")" />
+                            <span class="theme-swatch" style="background:@Swatch(defaultTheme)"></span>
+                            @Loc.F("Thème par défaut ({0})", Label(defaultTheme))</label>
+                        @foreach (var t in Themes.All)
+                        {
+                            <label class="form-check d-flex align-items-center gap-2 m-0">
+                                <InputRadio class="form-check-input m-0" Value="@t.Key" />
+                                <span class="theme-swatch" style="background:@t.Swatch"></span>
+                                @Loc.T(t.Label)
+                            </label>
+                        }
+                    </div>
+                </InputRadioGroup>
+                <button class="btn btn-primary" type="submit">@Loc.T("Appliquer")</button>
+            </EditForm>
+        </div></div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "profile")] private ProfileModel ProfileInput { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "password")] private PasswordModel PasswordInput { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "theme")] private ThemeModel ThemeInput { get; set; } = default!;
+    [SupplyParameterFromQuery] private string? Saved { get; set; }
+
+    private string defaultTheme = Themes.Fallback;
+
+    private ApplicationUser user = default!;
+    private string? message, error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await Users.GetUserAsync(HttpContext.User)
+            ?? throw new InvalidOperationException("Utilisateur introuvable.");
+        ProfileInput ??= new ProfileModel { Name = user.Name, Email = user.Email ?? "" };
+        PasswordInput ??= new PasswordModel();
+        await using var db = Dbs.Create();
+        defaultTheme = Themes.Valid(await Themes.GlobalAsync(db, Themes.DefaultOption));
+        ThemeInput ??= new ThemeModel
+        {
+            Theme = await db.UserSettings.Where(s => s.UserId == user.Id && s.Key == Themes.UserKey).Select(s => s.Value).FirstOrDefaultAsync() ?? "",
+        };
+        if (Saved == "theme")
+            message = Loc.T("Thème appliqué.");
+    }
+
+    private static string Label(string key) => Loc.T(Themes.All.First(t => t.Key == key).Label);
+    private static string Swatch(string key) => Themes.All.First(t => t.Key == key).Swatch;
+
+    // The page's <html data-theme> is already rendered: reload so the new theme shows.
+    private async Task SaveTheme()
+    {
+        await using var db = Dbs.Create();
+        await Themes.SetUserAsync(db, user.Id, ThemeInput.Theme);
+        Navigation.NavigateTo("admin/profile?saved=theme");
+    }
+
+    private async Task SaveProfile()
+    {
+        var email = ProfileInput.Email.Trim();
+        if (await Users.Users.AnyAsync(u => u.Email == email && u.Id != user.Id))
+        {
+            error = Loc.T("Cet e-mail est déjà utilisé.");
+            return;
+        }
+        user.Name = ProfileInput.Name.Trim();
+        user.Email = email;
+        user.UserName = email;
+        user.UpdatedAt = Timestamp.Now();
+        var result = await Users.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+        await SignIn.RefreshSignInAsync(user);
+        message = Loc.T("Profil enregistré.");
+    }
+
+    private async Task ChangePassword()
+    {
+        // Never render submitted passwords back into the page, whatever the outcome.
+        var input = PasswordInput;
+        PasswordInput = new PasswordModel();
+
+        var problems = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        if (!Validator.TryValidateObject(input, new ValidationContext(input), problems, validateAllProperties: true))
+        {
+            error = string.Join(" ", problems.Select(p => p.ErrorMessage));
+            return;
+        }
+
+        var result = await Users.ChangePasswordAsync(user, input.Current, input.New);
+        if (!result.Succeeded)
+        {
+            error = result.Errors.Any(e => e.Code == "PasswordMismatch")
+                ? Loc.T("Le mot de passe actuel est incorrect.")
+                : string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+        user.UpdatedAt = Timestamp.Now();
+        await Users.UpdateAsync(user);
+        await SignIn.RefreshSignInAsync(user);
+        message = Loc.T("Mot de passe modifié.");
+    }
+
+    private sealed class ProfileModel
+    {
+        [LocRequired(ErrorMessage = "Le nom est obligatoire.")]
+        public string Name { get; set; } = "";
+
+        [LocRequired(ErrorMessage = "L'e-mail est obligatoire.")]
+        [LocEmail(ErrorMessage = "E-mail invalide.")]
+        public string Email { get; set; } = "";
+    }
+
+    private sealed class ThemeModel
+    {
+        public string? Theme { get; set; } = "";
+    }
+
+    private sealed class PasswordModel
+    {
+        [LocRequired(ErrorMessage = "Le mot de passe actuel est obligatoire.")]
+        public string Current { get; set; } = "";
+
+        [LocRequired(ErrorMessage = "Le nouveau mot de passe est obligatoire.")]
+        [LocMinLength(8, ErrorMessage = "8 caractères minimum.")]
+        public string New { get; set; } = "";
+
+        [LocCompare(nameof(New), ErrorMessage = "La confirmation ne correspond pas.")]
+        public string Confirm { get; set; } = "";
+    }
+}

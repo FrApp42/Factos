@@ -1,0 +1,64 @@
+@page "/admin/expenses"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Dépenses · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Dépenses")</h1>
+    <a class="btn btn-primary" href="admin/expenses/create">@Loc.T("+ Nouvelle dépense")</a>
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucune dépense.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Date")</th><th>@Loc.T("Catégorie")</th><th>@Loc.T("Notes")</th><th class="money">@Loc.T("Montant")</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/expenses/@r.Expense.Id/edit">@Current.Date(r.Expense.ExpenseDate)</a></td>
+                        <td>@r.Category</td>
+                        <td class="small text-muted">@r.Expense.Notes</td>
+                        <td class="money">@Current.Money(r.Expense.Amount)</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Expense)">@Loc.T("Supprimer")</button></td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot><tr class="fw-bold"><td colspan="3">@Loc.T("Total")</td><td class="money">@Current.Money(rows.Sum(r => r.Expense.Amount))</td><td></td></tr></tfoot>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(Expense Expense, string Category);
+    private List<Row>? rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        var categories = await db.ExpenseCategories.Where(c => c.CompanyId == Current.Id).ToDictionaryAsync(c => c.Id, c => c.Name);
+        rows = (await db.Expenses.Where(e => e.CompanyId == Current.Id).OrderByDescending(e => e.ExpenseDate).ThenByDescending(e => e.Id).ToListAsync())
+            .Select(e => new Row(e, categories.GetValueOrDefault(e.ExpenseCategoryId, ""))).ToList();
+    }
+
+    private async Task Delete(Expense expense)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.T("Supprimer cette dépense ?")))
+            return;
+        await using var db = Dbs.Create();
+        await db.Taxes.Where(t => t.ExpenseId == expense.Id).ExecuteDeleteAsync();
+        await db.Expenses.Where(e => e.Id == expense.Id && e.CompanyId == Current.Id).ExecuteDeleteAsync();
+        await Load();
+    }
+}

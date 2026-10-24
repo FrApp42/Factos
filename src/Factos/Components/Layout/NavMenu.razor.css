@@ -1,0 +1,89 @@
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 2.75rem;
+    height: 2.5rem;
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    border: 1px solid var(--chrome-line);
+    border-radius: .5rem;
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28244, 243, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.5rem var(--chrome-hover);
+}
+
+.navbar-toggler:checked {
+    background-color: var(--chrome-active);
+}
+
+.top-row {
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 1.25rem;
+}
+
+    .top-row ::deep .brand {
+        color: var(--chrome-fg);
+    }
+
+.nav-item {
+    font-size: .875rem;
+    font-weight: 500;
+    padding: 0 .75rem .125rem;
+}
+
+    .nav-item ::deep .nav-link {
+        position: relative;
+        color: var(--chrome-muted);
+        border-radius: .5rem;
+        padding: .5rem .75rem;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        transition: background-color .15s, color .15s;
+    }
+
+    .nav-item ::deep .nav-link:hover {
+        background-color: var(--chrome-hover);
+        color: var(--chrome-fg);
+    }
+
+    /* Active: a lighter fill and the accent bar at the start */
+    .nav-item ::deep a.active {
+        background-color: var(--chrome-active);
+        color: var(--chrome-fg);
+    }
+
+    .nav-item ::deep a.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: .5rem;
+        bottom: .5rem;
+        width: 2px;
+        border-radius: 999px;
+        background: var(--chrome-accent);
+    }
+
+.nav-scrollable {
+    display: none;
+}
+
+.navbar-toggler:checked ~ .nav-scrollable {
+    display: block;
+}
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        /* Never collapse the sidebar for wide screens */
+        display: block;
+
+        /* Allow sidebar to scroll for tall menus */
+        height: calc(100vh - 3.5rem);
+        overflow-y: auto;
+    }
+}

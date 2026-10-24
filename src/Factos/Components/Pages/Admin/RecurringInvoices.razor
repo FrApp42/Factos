@@ -1,0 +1,98 @@
+@page "/admin/recurring-invoices"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Recurring Recurring
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Factures récurrentes · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Factures récurrentes")</h1>
+    <a class="btn btn-primary" href="admin/recurring-invoices/create">@Loc.T("+ Nouvelle récurrence")</a>
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucune facture récurrente.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Client")</th><th>@Loc.T("Fréquence")</th><th>@Loc.T("Prochaine facture")</th><th>@Loc.T("Générées")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Montant")</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/recurring-invoices/@r.Schedule.Id/edit">@r.Customer</a>
+                            @if (r.Schedule.LastError is { } err) { <div class="small text-danger">@Loc.F("Échec : {0}", err)</div> }</td>
+                        <td>@Frequencies.Label(r.Schedule.Frequency)</td>
+                        <td>@(r.Schedule.Status == Recurring.Active ? Current.Date(r.NextLocal) : "—")</td>
+                        <td>@r.Generated@(r.Schedule.LimitBy == "COUNT" ? $" / {r.Schedule.LimitCount}" : "")</td>
+                        <td><span class="status @(r.Schedule.Status switch { Recurring.Active => "status-blue", Recurring.OnHold => "status-yellow", _ => "status-green" })">@StatusLabel(r.Schedule.Status)</span></td>
+                        <td class="money">@Current.Money(r.Schedule.Total, r.Currency)</td>
+                        <td class="text-end text-nowrap">
+                            @if (r.Schedule.Status == Recurring.Active)
+                            {
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => SetStatus(r.Schedule, Recurring.OnHold)">@Loc.T("Suspendre")</button>
+                            }
+                            else if (r.Schedule.Status == Recurring.OnHold)
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => SetStatus(r.Schedule, Recurring.Active)">@Loc.T("Reprendre")</button>
+                            }
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Schedule)">@Loc.T("Supprimer")</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(RecurringInvoice Schedule, string Customer, int Generated, DateTime? NextLocal, Currency? Currency);
+    private List<Row>? rows;
+
+    private static string StatusLabel(string status) => status switch
+    {
+        Recurring.Active => "Active",
+        Recurring.OnHold => "Suspendue",
+        Recurring.Completed => Loc.T("Terminée"),
+        _ => status,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        var zone = Cadence.Zone(Current.Setting("time_zone"));
+        var schedules = await db.RecurringInvoices.Where(r => r.CompanyId == Current.Id).OrderByDescending(r => r.Id).ToListAsync();
+        var customers = await db.Customers.Where(c => c.CompanyId == Current.Id).ToDictionaryAsync(c => c.Id, c => c.Name);
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        var list = new List<Row>();
+        foreach (var s in schedules)
+            list.Add(new Row(s,
+                s.CustomerId is { } c ? customers.GetValueOrDefault(c, "") : "",
+                await Recurring.GeneratedCountAsync(s.Id),
+                s.NextInvoiceAt is { } next ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(next, DateTimeKind.Utc), zone) : null,
+                s.CurrencyId is { } cur ? currencies.GetValueOrDefault(cur) : Current.Currency));
+        rows = list;
+    }
+
+    private async Task SetStatus(RecurringInvoice schedule, string status)
+    {
+        await Recurring.SetStatusAsync(Current.Id, schedule.Id, status);
+        await Load();
+    }
+
+    private async Task Delete(RecurringInvoice schedule)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.T("Supprimer cette récurrence ? Les factures déjà générées sont conservées.")))
+            return;
+        await Recurring.DeleteAsync(Current.Id, schedule.Id);
+        await Load();
+    }
+}

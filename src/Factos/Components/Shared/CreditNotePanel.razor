@@ -1,0 +1,89 @@
+@* Credit note for an issued invoice: whole or line by line, by quantity. *@
+@inject CreditNotes Credits
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+
+<div class="card mb-3 no-print">
+    <div class="card-body">
+        <h2 class="h6 mb-3">@Loc.T("Créer une note de crédit")</h2>
+        @if (error is not null) { <div class="alert alert-danger">@error</div> }
+        @if (lines is null) { <p>@Loc.T("Chargement…")</p> }
+        else
+        {
+            <table class="table table-sm align-middle">
+                <thead><tr><th>@Loc.T("Ligne")</th><th class="money">@Loc.T("Prix")</th><th class="money">@Loc.T("Créditable")</th><th style="width:9rem">@Loc.T("Quantité à créditer")</th></tr></thead>
+                <tbody>
+                    @foreach (var line in lines)
+                    {
+                        <tr>
+                            <td>@line.Name</td>
+                            <td class="money">@D.Money(line.Price)</td>
+                            <td class="money">@line.Remaining.ToString("0.##")</td>
+                            <td><input type="number" step="0.01" min="0" max="@line.Remaining" class="form-control form-control-sm"
+                                       aria-label="Quantité à créditer pour @line.Name" @bind="line.Quantity" disabled="@(line.Remaining == 0)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Motif")</span>
+                <input class="form-control" @bind="reason" placeholder="@Loc.T("Ex. : remise commerciale, erreur de facturation, retour…")" /></label>
+            <div class="form-text mb-3">@Loc.F("Le montant crédité ne peut pas dépasser le reste à payer de la facture ({0}).", D.Money(D.DueAmount))</div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" disabled="@saving" @onclick="Create">@Loc.T("Créer la note de crédit")</button>
+                <button class="btn btn-outline-secondary" @onclick="OnClose">@Loc.T("Fermer")</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DocumentData D { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private sealed class Line
+    {
+        public int ItemId { get; init; }
+        public string Name { get; init; } = "";
+        public long Price { get; init; }
+        public decimal Remaining { get; init; }
+        public decimal Quantity { get; set; }
+    }
+
+    private List<Line>? lines;
+    private string? reason, error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var remaining = await Credits.RemainingQuantitiesAsync((int)D.Id);
+        await using var db = Dbs.Create();
+        var items = await db.InvoiceItems.Where(i => i.InvoiceId == D.Id).OrderBy(i => i.Id).ToListAsync();
+        lines = items.Select(i => new Line
+        {
+            ItemId = i.Id, Name = i.Name, Price = i.Price,
+            Remaining = remaining.GetValueOrDefault(i.Id), Quantity = remaining.GetValueOrDefault(i.Id),
+        }).ToList();
+    }
+
+    [Inject] private AppDbFactory Dbs { get; set; } = default!;
+
+    private async Task Create()
+    {
+        error = null;
+        saving = true;
+        try
+        {
+            var id = await Credits.CreateAsync(Current.Id, Current.UserId, (int)D.Id,
+                lines!.Where(l => l.Quantity > 0).ToDictionary(l => l.ItemId, l => l.Quantity), reason);
+            Navigation.NavigateTo($"admin/invoices/{id}/view");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

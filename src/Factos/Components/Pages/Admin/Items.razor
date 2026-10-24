@@ -1,0 +1,71 @@
+@page "/admin/items"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Articles · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Articles")</h1>
+    <a class="btn btn-primary" href="admin/items/create">@Loc.T("+ Nouvel article")</a>
+</div>
+
+<input class="form-control mb-3" placeholder="@Loc.T("Rechercher…")" @bind="search" @bind:event="oninput" @bind:after="Load" />
+
+@if (items is null) { <p>@Loc.T("Chargement…")</p> }
+else if (items.Count == 0) { <p class="text-muted">@Loc.T("Aucun article.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Nom")</th><th>@Loc.T("Unité")</th><th>@Loc.T("Description")</th><th class="money">@Loc.T("Prix")</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        <td><a href="admin/items/@item.Id/edit">@item.Name</a></td>
+                        <td>@(item.UnitId is { } u ? units.GetValueOrDefault(u) : "")</td>
+                        <td class="text-muted small">@item.Description</td>
+                        <td class="money">@Current.Money(item.Price)</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(item)">@Loc.T("Supprimer")</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private List<Item>? items;
+    private Dictionary<int, string> units = [];
+    private string search = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        units = await db.Units.Where(u => u.CompanyId == Current.Id).ToDictionaryAsync(u => u.Id, u => u.Name);
+        var q = db.Items.Where(i => i.CompanyId == Current.Id);
+        if (!string.IsNullOrWhiteSpace(search))
+            q = q.Where(i => i.Name.Contains(search));
+        items = await q.OrderBy(i => i.Name).ToListAsync();
+    }
+
+    private async Task Delete(Item item)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.F("Supprimer l'article « {0} » ?", item.Name)))
+            return;
+        await using var db = Dbs.Create();
+        // Document lines keep their own copy of name and price; they only lose the link.
+        await db.InvoiceItems.Where(x => x.ItemId == item.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ItemId, (int?)null));
+        await db.EstimateItems.Where(x => x.ItemId == item.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ItemId, (int?)null));
+        await db.Taxes.Where(t => t.ItemId == item.Id).ExecuteDeleteAsync();
+        await db.Items.Where(i => i.Id == item.Id && i.CompanyId == Current.Id).ExecuteDeleteAsync();
+        await Load();
+    }
+}

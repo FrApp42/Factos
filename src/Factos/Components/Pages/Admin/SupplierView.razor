@@ -1,0 +1,336 @@
+@page "/admin/suppliers/{Id:long}"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Purchases Purchases
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Fournisseur · Factos")</PageTitle>
+
+@if (supplier is null) { <p>@Loc.T("Chargement…")</p> return; }
+
+<div class="page-head">
+    <h1>@supplier.Name</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary" href="admin/bills/create?supplier=@Id">@Loc.T("+ Facture")</a>
+        <button class="btn btn-outline-primary" @onclick="StartPayment">@Loc.T("+ Paiement")</button>
+        <a class="btn btn-outline-primary" href="admin/supplier-credits/create?supplier=@Id">@Loc.T("+ Avoir")</a>
+        <a class="btn btn-outline-secondary" href="admin/suppliers/@Id/edit">@Loc.T("Modifier")</a>
+    </div>
+</div>
+
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="d-flex gap-4 flex-wrap mb-3">
+    <span>@Loc.T("À payer :") <strong>@Current.Money(bills.Where(b => b.Status == Purchases.Open).Sum(b => b.DueAmount), currency)</strong></span>
+    <span>@Loc.T("Avances :") <strong>@Current.Money(payments.Sum(p => p.Available), currency)</strong></span>
+    <span>@Loc.T("Avoirs disponibles :") <strong>@Current.Money(credits.Sum(c => c.Available), currency)</strong></span>
+</div>
+
+@if (panel is not null)
+{
+    <div class="card mb-3 border-primary"><div class="card-body">
+        <h2 class="h6">@panel.Title</h2>
+        <div class="row g-2 mb-2">
+            @if (panel.Mode != "allocate")
+            {
+                <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Montant ({0}) *", Cur(panel.CurrencyId)?.Code)</span>
+                    <input type="number" step="0.01" min="0" class="form-control" @bind="panel.Amount" /></label></div>
+                <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Date *")</span><InputDate class="form-control" @bind-Value="panel.Date" /></label></div>
+                <div class="col-md-3">
+                    <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Moyen de paiement")</span>
+                        <InputSelect class="form-select" @bind-Value="panel.MethodId">
+                            <option value="">—</option>
+                            @foreach (var m in methods) { <option value="@m.Id">@m.Name</option> }
+                        </InputSelect></label>
+                </div>
+                <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Référence")</span><InputText class="form-control" @bind-Value="panel.Reference" /></label></div>
+                @if (panel.CurrencyId != Current.Currency?.Id)
+                {
+                    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Taux de change *")</span>
+                        <input type="number" step="0.000001" min="0" class="form-control" @bind="panel.Rate" /></label></div>
+                }
+            }
+        </div>
+        @if (panel.Mode != "refund")
+        {
+            @if (panel.Rows.Count == 0)
+            {
+                <p class="text-muted">@Loc.F("Aucune facture ouverte dans cette devise{0}", (panel.Mode == "payment" ? " : le paiement restera en avance." : "."))</p>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm align-middle">
+                    <thead><tr><th>@Loc.T("Facture")</th><th>@Loc.T("Échéance")</th><th class="money">@Loc.T("Reste à payer")</th><th style="width:11rem">@Loc.T("Montant affecté")</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in panel.Rows)
+                        {
+                            <tr>
+                                <td>@r.Bill.Number</td>
+                                <td>@Current.Date(r.Bill.DueDate)</td>
+                                <td class="money">@Current.Money(r.Available, Cur(r.Bill.CurrencyId))</td>
+                                <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" aria-label="Montant affecté à @r.Bill.Number" @bind="r.Allocated" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table></div>
+            }
+        }
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SubmitPanel">@Loc.T("Enregistrer")</button>
+            <button class="btn btn-outline-secondary" @onclick="() => panel = null">@Loc.T("Annuler")</button>
+        </div>
+    </div></div>
+}
+
+<h2 class="h5">@Loc.T("Factures fournisseur")</h2>
+<div class="card mb-4"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Échéance")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Total")</th><th class="money">@Loc.T("Reste")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var b in bills)
+            {
+                <tr>
+                    <td><a href="admin/bills/@b.Id/edit">@b.Number</a> <span class="small text-muted">@b.Reference</span></td>
+                    <td>@Current.Date(b.DocumentDate)</td>
+                    <td>@Current.Date(b.DueDate)</td>
+                    <td><StatusBadge Status="@b.Status" /> @if (b.Status == Purchases.Open) { <StatusBadge Status="@Purchases.SettlementStatus(b)" /> }</td>
+                    <td class="money">@Current.Money(b.Total, Cur(b.CurrencyId))</td>
+                    <td class="money">@Current.Money(b.DueAmount, Cur(b.CurrencyId))</td>
+                    <td class="text-end text-nowrap">
+                        @if (b.Status == Purchases.Draft) { <button class="btn btn-sm btn-outline-primary" @onclick="() => Run(() => Purchases.OpenBillAsync(Current.Id, b.Id))">@Loc.T("Ouvrir")</button> }
+                        @if (b.Status == Purchases.Open) { <a class="btn btn-sm btn-outline-primary" href="admin/supplier-credits/create?supplier=@Id&bill=@b.Id">@Loc.T("Avoir")</a> }
+                        @if (b.Status != Purchases.Void) { <button class="btn btn-sm btn-outline-danger" @onclick="() => VoidAsync(r => Purchases.VoidBillAsync(Current.Id, b.Id, r))">@Loc.T("Annuler")</button> }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div></div>
+
+<h2 class="h5">@Loc.T("Paiements")</h2>
+<div class="card mb-4"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Montant")</th><th class="money">@Loc.T("Non affecté")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var (p, available) in payments)
+            {
+                <tr>
+                    <td>@p.Number <span class="small text-muted">@p.Reference</span></td>
+                    <td>@Current.Date(p.PaymentDate)</td>
+                    <td><StatusBadge Status="@p.Status" /></td>
+                    <td class="money">@Current.Money(p.Amount, Cur(p.CurrencyId))</td>
+                    <td class="money">@Current.Money(available, Cur(p.CurrencyId))</td>
+                    <td class="text-end text-nowrap">
+                        @if (p.Status == Purchases.Open)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => StartAllocate(p)">@Loc.T("Affecter")</button>
+                            @if (available > 0) { <button class="btn btn-sm btn-outline-success" @onclick="() => StartRefund(p, available)">@Loc.T("Rembourser")</button> }
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => VoidAsync(r => Purchases.VoidPaymentAsync(Current.Id, p.Id, r))">@Loc.T("Annuler")</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div></div>
+
+<h2 class="h5">@Loc.T("Avoirs")</h2>
+<div class="card mb-4"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Facture d'origine")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Total")</th><th class="money">@Loc.T("Disponible")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var (c, available) in credits)
+            {
+                <tr>
+                    <td>@c.Number <span class="small text-muted">@c.Reference</span></td>
+                    <td>@Current.Date(c.DocumentDate)</td>
+                    <td>@bills.FirstOrDefault(b => b.Id == c.SourceBillId)?.Number</td>
+                    <td><StatusBadge Status="@c.Status" /></td>
+                    <td class="money">@Current.Money(c.Total, Cur(c.CurrencyId))</td>
+                    <td class="money">@Current.Money(available, Cur(c.CurrencyId))</td>
+                    <td class="text-end text-nowrap">
+                        @if (c.Status == Purchases.Open)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => StartAllocate(c)">@Loc.T("Affecter")</button>
+                            @if (available > 0) { <button class="btn btn-sm btn-outline-success" @onclick="() => StartRefund(c, available)">@Loc.T("Rembourser")</button> }
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => VoidAsync(r => Purchases.VoidCreditAsync(Current.Id, c.Id, r))">@Loc.T("Annuler")</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div></div>
+
+<h2 class="h5">@Loc.T("Remboursements reçus")</h2>
+<div class="card mb-4"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Origine")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Montant")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var r in refunds)
+            {
+                <tr>
+                    <td>@r.Number <span class="small text-muted">@r.Reference</span></td>
+                    <td>@Current.Date(r.PaymentDate)</td>
+                    <td>@(payments.FirstOrDefault(p => p.Payment.Id == r.SupplierPaymentId).Payment?.Number ?? credits.FirstOrDefault(c => c.Credit.Id == r.SupplierCreditId).Credit?.Number)</td>
+                    <td><StatusBadge Status="@r.Status" /></td>
+                    <td class="money">@Current.Money(r.Amount, Cur(r.CurrencyId))</td>
+                    <td class="text-end">
+                        @if (r.Status == Purchases.Open) { <button class="btn btn-sm btn-outline-danger" @onclick="() => VoidAsync(reason => Purchases.VoidRefundAsync(Current.Id, r.Id, reason))">@Loc.T("Annuler")</button> }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div></div>
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private sealed class AllocationRow
+    {
+        public Bill Bill { get; init; } = null!;
+        /// What the source may put on the bill: its due amount plus what the source already pays.
+        public long Available { get; init; }
+        public decimal Allocated { get; set; }
+    }
+
+    /// "payment" = new payment, "allocate" = replace a source's allocations, "refund" = refund out of a source.
+    private sealed class Panel
+    {
+        public string Mode { get; init; } = "";
+        public string Title { get; init; } = "";
+        public PurchaseRecord? Source { get; init; }
+        public int CurrencyId { get; init; }
+        public decimal Amount { get; set; }
+        public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public int? MethodId { get; set; }
+        public string? Reference { get; set; }
+        public decimal Rate { get; set; } = 1;
+        public List<AllocationRow> Rows { get; init; } = [];
+    }
+
+    private Supplier? supplier;
+    private Currency? currency;
+    private Dictionary<int, Currency> currencies = [];
+    private List<PaymentMethod> methods = [];
+    private List<Bill> bills = [];
+    private List<(SupplierPayment Payment, long Available)> payments = [];
+    private List<(SupplierCredit Credit, long Available)> credits = [];
+    private List<SupplierRefund> refunds = [];
+    private Panel? panel;
+    private string? error;
+
+    private Currency? Cur(int id) => currencies.GetValueOrDefault(id);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        panel = null;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        supplier = await db.Suppliers.SingleAsync(s => s.Id == Id && s.CompanyId == Current.Id);
+        currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        currency = Cur(supplier.CurrencyId);
+        methods = await db.PaymentMethods.Where(m => m.CompanyId == Current.Id).OrderBy(m => m.Name).ToListAsync();
+        bills = await db.Bills.Where(b => b.SupplierId == Id && b.CompanyId == Current.Id).OrderByDescending(b => b.DocumentDate).ThenByDescending(b => b.Id).ToListAsync();
+        payments = [];
+        foreach (var p in await db.SupplierPayments.Where(p => p.SupplierId == Id && p.CompanyId == Current.Id).OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).ToListAsync())
+            payments.Add((p, await Purchases.AvailableAsync(db, p)));
+        credits = [];
+        foreach (var c in await db.SupplierCredits.Where(c => c.SupplierId == Id && c.CompanyId == Current.Id).OrderByDescending(c => c.DocumentDate).ThenByDescending(c => c.Id).ToListAsync())
+            credits.Add((c, await Purchases.AvailableAsync(db, c)));
+        refunds = await db.SupplierRefunds.Where(r => r.SupplierId == Id && r.CompanyId == Current.Id).OrderByDescending(r => r.PaymentDate).ThenByDescending(r => r.Id).ToListAsync();
+    }
+
+    private async Task<List<AllocationRow>> RowsAsync(PurchaseRecord? source, int currencyId)
+    {
+        await using var db = Dbs.Create();
+        List<BillAllocation> own = source switch
+        {
+            SupplierPayment p => [.. await db.SupplierPaymentAllocations.Where(a => a.SupplierPaymentId == p.Id).ToListAsync()],
+            SupplierCredit c => [.. await db.SupplierCreditAllocations.Where(a => a.SupplierCreditId == c.Id).ToListAsync()],
+            _ => [],
+        };
+        return bills.Where(b => b.Status == Purchases.Open && b.CurrencyId == currencyId)
+            .Select(b => (Bill: b, Own: own.Where(a => a.BillId == b.Id).Sum(a => a.Amount)))
+            .Where(x => x.Bill.DueAmount + x.Own > 0)
+            .OrderBy(x => x.Bill.DueDate).ThenBy(x => x.Bill.Id)
+            .Select(x => new AllocationRow { Bill = x.Bill, Available = x.Bill.DueAmount + x.Own, Allocated = Money.ToMajor(x.Own) })
+            .ToList();
+    }
+
+    private async Task StartPayment()
+    {
+        error = null;
+        panel = new Panel
+        {
+            Mode = "payment", Title = Loc.T("Nouveau paiement au fournisseur"), CurrencyId = supplier!.CurrencyId,
+            Rows = await RowsAsync(null, supplier.CurrencyId),
+        };
+    }
+
+    private async Task StartAllocate(PurchaseRecord source)
+    {
+        error = null;
+        panel = new Panel
+        {
+            Mode = "allocate", Title = $"Affecter {source.Number} aux factures", Source = source, CurrencyId = source.CurrencyId,
+            Rows = await RowsAsync(source, source.CurrencyId),
+        };
+    }
+
+    private void StartRefund(PurchaseRecord source, long available)
+    {
+        error = null;
+        panel = new Panel
+        {
+            Mode = "refund", Title = Loc.F("Remboursement reçu sur {0}", source.Number), Source = source, CurrencyId = source.CurrencyId,
+            Amount = Money.ToMajor(available), Rate = source.ExchangeRate,
+        };
+    }
+
+    private async Task SubmitPanel()
+    {
+        var p = panel!;
+        var shares = p.Rows.Where(r => r.Allocated > 0).Select(r => new BillShare(r.Bill.Id, Money.ToCents(r.Allocated))).ToList();
+        var form = new SupplierMoneyForm
+        {
+            SupplierId = Id, CurrencyId = p.CurrencyId, ExchangeRate = p.Rate, Amount = Money.ToCents(p.Amount),
+            PaymentDate = p.Date, PaymentMethodId = p.MethodId, Reference = p.Reference, Allocations = shares,
+            SupplierPaymentId = (p.Source as SupplierPayment)?.Id, SupplierCreditId = (p.Source as SupplierCredit)?.Id,
+        };
+        await Run(() => p.Mode switch
+        {
+            "payment" => (Task)Purchases.RecordPaymentAsync(Current.Id, Current.UserId, form),
+            "refund" => Purchases.RecordRefundAsync(Current.Id, Current.UserId, form),
+            _ => Purchases.ReplaceAllocationsAsync(Current.Id, p.Source is SupplierPayment ? "payment" : "credit", p.Source!.Id, shares),
+        });
+    }
+
+    private async Task VoidAsync(Func<string, Task> action)
+    {
+        var reason = await JS.InvokeAsync<string?>("prompt", "Motif de l'annulation :");
+        if (reason is not null)
+            await Run(() => action(reason));
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+            panel = null;
+            await Load();
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

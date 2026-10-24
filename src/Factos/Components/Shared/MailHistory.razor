@@ -1,0 +1,34 @@
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+
+@* E-mails sent for a document, with their opening when `mail_tracking` is on. *@
+@if (logs.Count > 0)
+{
+    <h2 class="h5 mt-4 no-print">@Loc.T("E-mails envoyés")</h2>
+    <table class="table no-print">
+        <thead><tr><th>@Loc.T("Date")</th><th>@Loc.T("Destinataire")</th><th>@Loc.T("Objet")</th><th>@Loc.T("Ouvert")</th></tr></thead>
+        <tbody>
+            @foreach (var l in logs)
+            {
+                <tr>
+                    <td>@Current.Date(l.CreatedAt)</td><td>@l.To</td><td>@l.Subject</td>
+                    <td>@if (l.OpenedAt is { } opened) { <span class="status status-green">@Loc.F("Ouvert le {0}", Current.Date(opened))</span> } else { <span class="status status-gray">@Loc.T("Non ouvert")</span> }</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired] public DocumentData D { get; set; } = default!;
+
+    private List<EmailLog> logs = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = Dbs.Create();
+        var id = D.Id.ToString();
+        logs = await db.EmailLogs.AsNoTracking().Where(l => l.MailableType == D.Kind && l.MailableId == id)
+            .OrderByDescending(l => l.Id).ToListAsync();
+    }
+}

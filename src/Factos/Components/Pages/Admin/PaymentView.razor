@@ -1,0 +1,44 @@
+@page "/admin/payments/{Id:long}/view"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.F("{0} · Factos", d?.Number)</PageTitle>
+
+@if (d is null) { <p>@Loc.T("Chargement…")</p> return; }
+
+<div class="page-head no-print">
+    <h1>@Loc.F("Paiement {0}", d.Number)</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-primary" href="admin/payments/@Id/edit">@Loc.T("Modifier")</a>
+        <a class="btn btn-outline-secondary" href="@($"payments/pdf/{d.UniqueHash}")" target="_blank">@Loc.T("Télécharger le reçu PDF")</a>
+        <button class="btn btn-outline-primary" @onclick="() => sending = !sending">@Loc.T("Envoyer le reçu par e-mail")</button>
+        <a class="btn btn-outline-secondary" href="admin/payments">@Loc.T("Retour")</a>
+    </div>
+</div>
+
+@if (sending)
+{
+    <SendPanel D="d" OnClose="() => sending = false" />
+}
+
+<DocumentSheet D="d" />
+
+<MailHistory D="d" />
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private DocumentData? d;
+    private bool sending;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        sending = false;
+        d = await DocumentData.LoadAsync(Dbs, Sales, DocumentData.Payment, Id, Current.Id);
+        if (d is null)
+            Navigation.NavigateTo("admin/payments");
+    }
+}

@@ -1,0 +1,52 @@
+@page "/admin/estimates"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+
+<PageTitle>@Loc.T("Devis · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Devis")</h1>
+    <a class="btn btn-primary" href="admin/estimates/create">@Loc.T("+ Nouveau devis")</a>
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucun devis.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Expiration")</th><th>@Loc.T("Client")</th><th>@Loc.T("Statut")</th><th class="money">@Loc.T("Total")</th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/estimates/@r.Estimate.Id/view">@r.Estimate.EstimateNumber</a></td>
+                        <td>@Current.Date(r.Estimate.EstimateDate)</td>
+                        <td>@Current.Date(r.Estimate.ExpiryDate)</td>
+                        <td>@r.Customer</td>
+                        <td><StatusBadge Status="@r.Estimate.Status" /></td>
+                        <td class="money">@Current.Money(r.Estimate.Total, r.Currency)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(Estimate Estimate, string Customer, Currency? Currency);
+    private List<Row>? rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        var estimates = await db.Estimates.Where(e => e.CompanyId == Current.Id)
+            .OrderByDescending(e => e.EstimateDate).ThenByDescending(e => e.Id).ToListAsync();
+        var customers = await db.Customers.Where(c => c.CompanyId == Current.Id).ToDictionaryAsync(c => c.Id, c => c.Name);
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        rows = estimates.Select(e => new Row(e,
+            e.CustomerId is { } c ? customers.GetValueOrDefault(c, "") : "",
+            e.CurrencyId is { } cur ? currencies.GetValueOrDefault(cur) : Current.Currency)).ToList();
+    }
+}

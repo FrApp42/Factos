@@ -1,0 +1,79 @@
+@page "/admin/payments"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.T("Paiements · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Paiements")</h1>
+    <a class="btn btn-primary" href="admin/payments/create">@Loc.T("+ Nouveau paiement")</a>
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucun paiement.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Client")</th><th>@Loc.T("Facture")</th><th>@Loc.T("Moyen")</th><th class="money">@Loc.T("Montant")</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><a href="admin/payments/@r.Payment.Id/view">@r.Payment.PaymentNumber</a></td>
+                        <td>@Current.Date(r.Payment.PaymentDate)</td>
+                        <td>@r.Customer</td>
+                        <td>@if (r.InvoiceId is { } iid) { <a href="admin/invoices/@iid/view">@r.Invoice</a> }</td>
+                        <td>@r.Method</td>
+                        <td class="money">@Current.Money(r.Payment.Amount, r.Currency)</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Payment)">@Loc.T("Supprimer")</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(Payment Payment, string Customer, int? InvoiceId, string Invoice, string Method, Currency? Currency);
+    private List<Row>? rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        var payments = await db.Payments.Where(p => p.CompanyId == Current.Id)
+            .OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).ToListAsync();
+        var ids = payments.Select(p => p.Id).ToList();
+        var allocations = await db.PaymentAllocations.Where(a => ids.Contains(a.PaymentId))
+            .Join(db.Invoices, a => a.InvoiceId, i => i.Id, (a, i) => new { a.PaymentId, i.Id, i.InvoiceNumber })
+            .ToListAsync();
+        var customers = await db.Customers.Where(c => c.CompanyId == Current.Id).ToDictionaryAsync(c => c.Id, c => c.Name);
+        var methods = await db.PaymentMethods.Where(m => m.CompanyId == Current.Id).ToDictionaryAsync(m => m.Id, m => m.Name);
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        rows = payments.Select(p =>
+        {
+            var allocation = allocations.FirstOrDefault(a => a.PaymentId == p.Id);
+            return new Row(p,
+                p.CustomerId is { } c ? customers.GetValueOrDefault(c, "") : "",
+                allocation?.Id, allocation?.InvoiceNumber ?? "",
+                p.PaymentMethodId is { } m ? methods.GetValueOrDefault(m, "") : "",
+                p.CurrencyId is { } cur ? currencies.GetValueOrDefault(cur) : Current.Currency);
+        }).ToList();
+    }
+
+    private async Task Delete(Payment payment)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.F("Supprimer le paiement {0} ? Le solde de la facture sera rétabli.", payment.PaymentNumber)))
+            return;
+        await Sales.DeletePaymentAsync(Current.Id, payment.Id);
+        await Load();
+    }
+}

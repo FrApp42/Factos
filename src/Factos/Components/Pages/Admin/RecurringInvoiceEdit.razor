@@ -1,0 +1,165 @@
+@page "/admin/recurring-invoices/create"
+@page "/admin/recurring-invoices/{Id:long}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Recurring Recurring
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Facture récurrente · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? Loc.T("Nouvelle facture récurrente") : Loc.T("Modifier la facture récurrente"))</h1></div>
+
+@if (form is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Client *")</span>
+            <select class="form-select" value="@form.CustomerId" @onchange="CustomerChanged">
+                <option value="">@Loc.T("— Choisir —")</option>
+                @foreach (var c in customers) { <option value="@c.Id">@c.Name</option> }
+            </select></label>
+    </div>
+    <div class="col-md-2">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Début *")</span>
+            <InputDate class="form-control" @bind-Value="form.StartsAt" /></label>
+    </div>
+    <div class="col-md-3">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Fréquence *")</span>
+            <select class="form-select" value="@preset" @onchange="PresetChanged">
+                @foreach (var (cron, label) in Frequencies.Presets) { <option value="@cron">@Loc.T(label)</option> }
+                <option value="@Frequencies.Custom">@Loc.T("Personnalisée (cron)")</option>
+            </select></label>
+    </div>
+    @if (preset == Frequencies.Custom)
+    {
+        <div class="col-md-3">
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Expression cron *")</span>
+                <input class="form-control font-monospace" @bind="form.Frequency" placeholder="0 0 1 * *" /></label>
+        </div>
+    }
+    <div class="col-md-3">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Limite")</span>
+            <select class="form-select" @bind="form.LimitBy">
+                <option value="NONE">@Loc.T("Aucune")</option>
+                <option value="COUNT">@Loc.T("Nombre de factures")</option>
+                <option value="DATE">@Loc.T("Jusqu'à une date")</option>
+            </select></label>
+    </div>
+    @if (form.LimitBy == "COUNT")
+    {
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nombre *")</span>
+            <InputNumber class="form-control" @bind-Value="form.LimitCount" min="1" /></label></div>
+    }
+    @if (form.LimitBy == "DATE")
+    {
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Date de fin *")</span>
+            <InputDate class="form-control" @bind-Value="form.LimitDate" /></label></div>
+    }
+    <div class="col-md-3">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Statut")</span>
+            <select class="form-select" @bind="form.Status">
+                <option value="@Recurring.Active">@Loc.T("Active")</option>
+                <option value="@Recurring.OnHold">@Loc.T("Suspendue")</option>
+                <option value="@Recurring.Completed">@Loc.T("Terminée")</option>
+            </select></label>
+    </div>
+    @if (customerCurrency is not null && Current.Currency is not null && customerCurrency.Id != Current.Currency.Id)
+    {
+        <div class="col-md-3">
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Taux de change (1 {0} = ? {1}) *", customerCurrency.Code, Current.Currency.Code)</span>
+                <InputNumber class="form-control" @bind-Value="form.ExchangeRate" step="0.000001" /></label>
+        </div>
+    }
+    <div class="col-12 form-text">
+        Les factures sont générées en brouillon, à l'heure de la société (@Current.Setting("time_zone", "UTC")).
+        L'envoi automatique par e-mail n'est pas encore disponible.
+    </div>
+</div></div>
+
+<DocumentLines Draft="form.Draft" Currency="customerCurrency" Items="items" TaxTypes="taxTypes">
+    <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span>
+        <InputTextArea class="form-control" rows="5" @bind-Value="form.Notes" /></label>
+</DocumentLines>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" disabled="@saving" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="admin/recurring-invoices">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private RecurringForm? form;
+    private string preset = "0 0 1 * *";
+    private List<Customer> customers = [];
+    private List<Item> items = [];
+    private List<TaxType> taxTypes = [];
+    private Currency? customerCurrency;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using (var db = Dbs.Create())
+        {
+            customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+            items = await db.Items.Where(i => i.CompanyId == Current.Id).OrderBy(i => i.Name).ToListAsync();
+            taxTypes = await db.TaxTypes.Where(t => t.CompanyId == Current.Id && t.TransactionType == "sales").OrderBy(t => t.Name).ToListAsync();
+        }
+        if (Id is { } id)
+        {
+            form = await Recurring.LoadAsync(Current.Id, id);
+        }
+        else
+        {
+            form = new RecurringForm();
+            form.Draft.TaxPerItem = Current.Setting("tax_per_item") == "YES";
+            form.Draft.DiscountPerItem = Current.Setting("discount_per_item") == "YES";
+            form.Draft.Items.Add(new DraftItem());
+        }
+        preset = Frequencies.Presets.Any(p => p.Cron == form.Frequency) ? form.Frequency : Frequencies.Custom;
+        await LoadCurrencyAsync();
+    }
+
+    private void PresetChanged(ChangeEventArgs e)
+    {
+        preset = e.Value?.ToString() ?? Frequencies.Custom;
+        if (preset != Frequencies.Custom)
+            form!.Frequency = preset;
+    }
+
+    private async Task CustomerChanged(ChangeEventArgs e)
+    {
+        form!.CustomerId = long.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadCurrencyAsync();
+    }
+
+    private async Task LoadCurrencyAsync()
+    {
+        var currencyId = customers.FirstOrDefault(c => c.Id == form!.CustomerId)?.CurrencyId;
+        await using var db = Dbs.Create();
+        customerCurrency = currencyId is { } cid ? await db.Currencies.FindAsync(cid) : Current.Currency;
+    }
+
+    private async Task Save()
+    {
+        error = null;
+        saving = true;
+        try
+        {
+            form!.Draft.Recalculate();
+            await Recurring.SaveAsync(Current.Id, Current.UserId, form);
+            Navigation.NavigateTo("admin/recurring-invoices");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

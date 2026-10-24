@@ -1,0 +1,28 @@
+@* Page the customer opens from the e-mail link (upstream's /customer/{kind}/view/{token}).
+   Rendered as a whole HTML document by the public endpoint, outside the app shell. *@
+@using Factos.Components.Shared
+@using Factos.Domain
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@D.Title @D.Number · @D.Company.Name</title>
+    <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/app.css" />
+</head>
+<body class="bg-light">
+    <main class="container py-4" style="max-width:900px">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h1 class="h4 m-0">@D.Title @D.Number</h1>
+            <a class="btn btn-primary" href="@PdfUrl">@Loc.T("Télécharger le PDF")</a>
+        </div>
+        <DocumentSheet D="D" />
+    </main>
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired] public DocumentData D { get; set; } = default!;
+    [Parameter, EditorRequired] public string PdfUrl { get; set; } = "";
+}

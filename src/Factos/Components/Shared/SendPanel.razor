@@ -1,0 +1,67 @@
+@* "Send by e-mail" form for a document; the body may use upstream's {PLACEHOLDERS}. *@
+@inject DocumentMailer Mailer
+@inject NavigationManager Navigation
+
+<div class="card mb-3 no-print">
+    <div class="card-body">
+        <h2 class="h6 mb-3">@Loc.T("Envoyer par e-mail")</h2>
+        @if (!DocumentMailer.Enabled(D)) { <div class="alert alert-warning">@Loc.T("L'envoi par e-mail est désactivé pour ce type de document (Paramètres › E-mails) ou pour ce client (fiche du client).")</div> }
+        @if (error is not null) { <div class="alert alert-danger">@error</div> }
+        @if (sent) { <div class="alert alert-success">E-mail envoyé à @form.To.</div> }
+        <div class="row g-2">
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("À *")</span><input class="form-control" type="email" @bind="form.To" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Cc")</span><input class="form-control" @bind="form.Cc" placeholder="@Loc.T("adresses séparées par des virgules")" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Cci")</span><input class="form-control" @bind="form.Bcc" /></label></div>
+            <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Objet *")</span><input class="form-control" @bind="form.Subject" /></label></div>
+            <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Message *")</span><textarea class="form-control" rows="4" @bind="form.Body"></textarea></label></div>
+            <div class="col-12 form-text">
+                Variables disponibles : {CONTACT_DISPLAY_NAME}, {PRIMARY_CONTACT_NAME}, {COMPANY_NAME},
+                @(D.Kind switch
+                {
+                    DocumentData.Payment => "{PAYMENT_NUMBER}, {PAYMENT_AMOUNT}, {PAYMENT_DATE}",
+                    DocumentData.Invoice => "{INVOICE_NUMBER}, {INVOICE_DATE}, {INVOICE_DUE_DATE}",
+                    DocumentData.Expense => "{EXPENSE_NUMBER}, {EXPENSE_AMOUNT}, {EXPENSE_DATE}, {EXPENSE_CATEGORY}",
+                    _ => "{ESTIMATE_NUMBER}, {ESTIMATE_DATE}, {ESTIMATE_EXPIRY_DATE}",
+                }).
+                @(DocumentMailer.AttachesPdf(D) ? Loc.T("Le PDF est joint à l'e-mail.") : "L'e-mail contient un lien vers le document en ligne.")
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" disabled="@(sending || !DocumentMailer.Enabled(D))" @onclick="Send">@(sending ? Loc.T("Envoi…") : "Envoyer")</button>
+            <button class="btn btn-outline-secondary" @onclick="OnClose">@Loc.T("Fermer")</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DocumentData D { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnSent { get; set; }
+
+    private SendForm form = new();
+    private string? error;
+    private bool sending, sent;
+
+    protected override void OnInitialized() => form = DocumentMailer.Prepare(D);
+
+    private async Task Send()
+    {
+        error = null;
+        sent = false;
+        sending = true;
+        try
+        {
+            await Mailer.SendAsync(D, form, Navigation.BaseUri);
+            sent = true;
+            await OnSent.InvokeAsync();
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+}

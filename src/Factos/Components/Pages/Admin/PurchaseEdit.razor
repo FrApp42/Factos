@@ -1,0 +1,266 @@
+@page "/admin/bills/create"
+@page "/admin/bills/{Id:long}/edit"
+@page "/admin/supplier-credits/create"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Purchases Purchases
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.F("{0} · Factos", Title)</PageTitle>
+
+<div class="page-head"><h1>@Title</h1></div>
+
+@if (form is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+@if (locked) { <div class="alert alert-info">@Loc.T("Cette facture est réglée ou créditée : seuls la référence, l'échéance et les notes peuvent changer.")</div> }
+@if (categories.Count == 0)
+{
+    <div class="alert alert-warning">@Loc.T("Créez d'abord une catégorie de dépense dans") <a href="admin/settings">@Loc.T("Paramètres")</a>.</div>
+}
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Fournisseur *")</span>
+            <select class="form-select" value="@form.SupplierId" @onchange="SupplierChanged" disabled="@(sourceBill is not null || locked)">
+                <option value="0">@Loc.T("— Choisir —")</option>
+                @foreach (var s in suppliers) { <option value="@s.Id">@s.Name</option> }
+            </select></label>
+    </div>
+    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Date *")</span><InputDate class="form-control" @bind-Value="form.DocumentDate" disabled="@locked" /></label></div>
+    @if (!IsCredit)
+    {
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Échéance *")</span><InputDate class="form-control" @bind-Value="form.DueDate" /></label></div>
+    }
+    <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Référence fournisseur")</span><InputText class="form-control" @bind-Value="form.Reference" /></label></div>
+    @if (Foreign && sourceBill is null)
+    {
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Taux de change ({0} → {1}) *", Cur?.Code, Current.Currency?.Code)</span>
+            <input type="number" step="0.000001" min="0" class="form-control" @bind="form.ExchangeRate" disabled="@locked" /></label></div>
+    }
+    @if (sourceBill is null)
+    {
+        <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check form-switch"><InputCheckbox class="form-check-input" role="switch" id="incl" @bind-Value="form.TaxIncluded" disabled="@locked" /><label class="form-check-label" for="incl">@Loc.T("Prix taxes comprises")</label></div>
+        </div>
+    }
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span><InputTextArea class="form-control" rows="2" @bind-Value="form.Notes" /></label></div>
+</div></div>
+
+@if (sourceBill is not null)
+{
+    <h2 class="h6">@Loc.F("Lignes de la facture {0} à créditer", sourceBill.Number)</h2>
+    <div class="card mb-3"><div class="table-responsive"><table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Description")</th><th class="money">@Loc.T("Facturé")</th><th class="money">@Loc.T("Déjà crédité")</th><th class="money">@Loc.T("Total ligne")</th><th style="width:10rem">@Loc.T("Quantité à créditer")</th></tr></thead>
+        <tbody>
+            @foreach (var r in creditRows)
+            {
+                <tr>
+                    <td>@r.Item.Description</td>
+                    <td class="money">@r.Item.Quantity.ToString("0.##")</td>
+                    <td class="money">@r.Credited.ToString("0.##")</td>
+                    <td class="money">@Current.Money(r.Item.Total, Cur)</td>
+                    <td><input type="number" step="0.01" min="0" max="@(r.Item.Quantity - r.Credited)" class="form-control form-control-sm"
+                               aria-label="Quantité à créditer pour @r.Item.Description" @bind="r.Quantity" /></td>
+                </tr>
+            }
+        </tbody>
+    </table></div></div>
+}
+else
+{
+    <div class="card mb-3"><div class="table-responsive"><table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Description *")</th><th>@Loc.T("Catégorie *")</th><th style="width:7rem">@Loc.T("Qté")</th><th style="width:9rem">@Loc.F("Prix ({0})", Cur?.Code)</th><th style="width:7rem">@Loc.T("Remise %")</th><th>@Loc.T("Taxes")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var line in lines)
+            {
+                <tr>
+                    <td><input class="form-control form-control-sm" aria-label="@Loc.T("Description")" @bind="line.Description" disabled="@locked" /></td>
+                    <td><select class="form-select form-select-sm" aria-label="@Loc.T("Catégorie")" @bind="line.ExpenseCategoryId" disabled="@locked">
+                        @foreach (var c in categories) { <option value="@c.Id">@c.Name</option> }
+                    </select></td>
+                    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" aria-label="@Loc.T("Quantité")" @bind="line.Quantity" disabled="@locked" /></td>
+                    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" aria-label="@Loc.T("Prix")" @bind="line.Price" disabled="@locked" /></td>
+                    <td><input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" aria-label="@Loc.T("Remise en pourcentage")" @bind="line.Discount" disabled="@locked" /></td>
+                    <td>
+                        @foreach (var t in taxTypes)
+                        {
+                            <label class="form-check form-switch form-check-inline small mb-0">
+                                <input type="checkbox" class="form-check-input" role="switch" checked="@line.TaxTypeIds.Contains(t.Id)" disabled="@locked"
+                                       @onchange="e => ToggleTax(line, t.Id, (bool)e.Value!)" />@t.Name
+                            </label>
+                        }
+                    </td>
+                    <td class="text-end">@if (!locked && lines.Count > 1) { <button class="btn btn-sm btn-outline-danger" @onclick="() => lines.Remove(line)" aria-label="@Loc.T("Supprimer la ligne")">×</button> }</td>
+                </tr>
+            }
+        </tbody>
+    </table></div>
+    @if (!locked)
+    {
+        <div class="card-body pt-2"><button class="btn btn-sm btn-outline-primary" @onclick="AddLine">@Loc.T("+ Ligne")</button>
+            @if (taxTypes.Count == 0) { <span class="small text-muted ms-2">@Loc.T("Aucune taxe d'achat : créez-en dans Paramètres › Taxes (type « Achats »).")</span> }
+        </div>
+    }
+    </div>
+}
+
+<div class="d-flex gap-2">
+    @if (IsCredit)
+    {
+        <button class="btn btn-primary" @onclick="() => Save(Purchases.Open)">@Loc.T("Enregistrer l'avoir")</button>
+    }
+    else if (Id is null || status == Purchases.Draft)
+    {
+        <button class="btn btn-primary" @onclick="() => Save(Purchases.Open)">@Loc.T("Enregistrer et ouvrir")</button>
+        <button class="btn btn-outline-primary" @onclick="() => Save(Purchases.Draft)">@Loc.T("Enregistrer en brouillon")</button>
+    }
+    else
+    {
+        <button class="btn btn-primary" @onclick="() => Save(Purchases.Open)">@Loc.T("Enregistrer")</button>
+    }
+    <a class="btn btn-outline-secondary" href="@(form.SupplierId == 0 ? "admin/suppliers" : $"admin/suppliers/{form.SupplierId}")">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "supplier")] public long? SupplierQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "bill")] public long? BillQuery { get; set; }
+
+    /// A purchase line as typed: prices in major units.
+    private sealed class Line
+    {
+        public string Description { get; set; } = "";
+        public int ExpenseCategoryId { get; set; }
+        public decimal Quantity { get; set; } = 1;
+        public decimal Price { get; set; }
+        public decimal Discount { get; set; }
+        public List<int> TaxTypeIds { get; set; } = [];
+    }
+
+    private sealed class CreditRow
+    {
+        public BillItem Item { get; init; } = null!;
+        public decimal Credited { get; init; }
+        public decimal Quantity { get; set; }
+    }
+
+    private PurchaseForm? form;
+    private string status = Purchases.Draft;
+    private bool locked;
+    private Bill? sourceBill;
+    private List<Line> lines = [];
+    private List<CreditRow> creditRows = [];
+    private List<Supplier> suppliers = [];
+    private List<ExpenseCategory> categories = [];
+    private List<TaxType> taxTypes = [];
+    private Dictionary<int, Currency> currencies = [];
+    private string? error;
+
+    private bool IsCredit => Navigation.Uri.Contains("/supplier-credits/");
+    private string Title => IsCredit ? "Nouvel avoir fournisseur" : Id is null ? Loc.T("Nouvelle facture fournisseur") : $"Facture fournisseur {number}";
+    private string? number;
+    private Currency? Cur => currencies.GetValueOrDefault(form?.CurrencyId ?? 0);
+    private bool Foreign => form is not null && form.CurrencyId != Current.Currency?.Id;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        suppliers = await db.Suppliers.Where(s => s.CompanyId == Current.Id && s.Enabled).OrderBy(s => s.Name).ToListAsync();
+        categories = await db.ExpenseCategories.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+        taxTypes = await db.TaxTypes.Where(t => t.CompanyId == Current.Id && t.Type == "GENERAL" && t.TransactionType == "purchases").OrderBy(t => t.Name).ToListAsync();
+        currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+
+        if (Id is { } id)
+        {
+            var bill = await db.Bills.SingleAsync(b => b.Id == id && b.CompanyId == Current.Id);
+            (number, status, locked) = (bill.Number, bill.Status, bill.FinancialLockedAt is not null || bill.Status == Purchases.Void);
+            if (suppliers.All(s => s.Id != bill.SupplierId))
+                suppliers.Add(await db.Suppliers.SingleAsync(s => s.Id == bill.SupplierId));
+            form = new PurchaseForm
+            {
+                SupplierId = bill.SupplierId, CurrencyId = bill.CurrencyId, ExchangeRate = bill.ExchangeRate, Reference = bill.Reference,
+                DocumentDate = bill.DocumentDate, DueDate = bill.DueDate, Notes = bill.Notes, TaxIncluded = bill.TaxIncluded,
+            };
+            lines = (await db.BillItems.Where(i => i.BillId == id).OrderBy(i => i.Id).ToListAsync()).Select(i => new Line
+            {
+                Description = i.Description, ExpenseCategoryId = i.ExpenseCategoryId, Quantity = i.Quantity,
+                Price = Money.ToMajor(i.Price), Discount = i.Discount, TaxTypeIds = Purchases.TaxIds(i),
+            }).ToList();
+            return;
+        }
+
+        form = new PurchaseForm();
+        if (BillQuery is { } billId && IsCredit)
+        {
+            sourceBill = await db.Bills.SingleAsync(b => b.Id == billId && b.CompanyId == Current.Id);
+            form.SupplierId = sourceBill.SupplierId;
+            form.CurrencyId = sourceBill.CurrencyId;
+            var items = await db.BillItems.Where(i => i.BillId == billId).OrderBy(i => i.Id).ToListAsync();
+            var itemIds = items.Select(i => i.Id).ToList();
+            var credited = await db.SupplierCreditItems
+                .Where(i => i.SourceBillItemId != null && itemIds.Contains(i.SourceBillItemId.Value)
+                    && db.SupplierCredits.Any(c => c.Id == i.SupplierCreditId && c.Status != Purchases.Void))
+                .GroupBy(i => i.SourceBillItemId!.Value).Select(g => new { g.Key, Sum = g.Sum(i => i.Quantity) })
+                .ToDictionaryAsync(x => x.Key, x => x.Sum);
+            creditRows = items.Select(i => new CreditRow { Item = i, Credited = credited.GetValueOrDefault(i.Id) }).ToList();
+            return;
+        }
+        if (suppliers.FirstOrDefault(s => s.Id == SupplierQuery) is { } supplier)
+            SetSupplier(supplier);
+        AddLine();
+    }
+
+    private void SupplierChanged(ChangeEventArgs e)
+    {
+        if (suppliers.FirstOrDefault(s => s.Id.ToString() == e.Value?.ToString()) is { } supplier)
+            SetSupplier(supplier);
+    }
+
+    private void SetSupplier(Supplier supplier)
+    {
+        form!.SupplierId = supplier.Id;
+        form.CurrencyId = supplier.CurrencyId;
+        form.DueDate = form.DocumentDate.AddDays(supplier.PaymentTerms);
+        foreach (var line in lines.Where(l => l.ExpenseCategoryId == 0))
+            line.ExpenseCategoryId = supplier.ExpenseCategoryId ?? categories.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private void AddLine() => lines.Add(new Line
+    {
+        ExpenseCategoryId = suppliers.FirstOrDefault(s => s.Id == form?.SupplierId)?.ExpenseCategoryId ?? categories.FirstOrDefault()?.Id ?? 0,
+    });
+
+    private static void ToggleTax(Line line, int taxId, bool on)
+    {
+        line.TaxTypeIds.Remove(taxId);
+        if (on)
+            line.TaxTypeIds.Add(taxId);
+    }
+
+    private async Task Save(string target)
+    {
+        error = null;
+        form!.Status = target;
+        form.Items = sourceBill is not null
+            ? creditRows.Where(r => r.Quantity > 0).Select(r => new PurchaseLine { SourceBillItemId = r.Item.Id, Quantity = r.Quantity }).ToList()
+            : lines.Select(l => new PurchaseLine
+            {
+                Description = l.Description, ExpenseCategoryId = l.ExpenseCategoryId, Quantity = l.Quantity,
+                Price = Money.ToCents(l.Price), Discount = l.Discount, TaxTypeIds = [.. l.TaxTypeIds],
+            }).ToList();
+        form.SourceBillId = sourceBill?.Id;
+        try
+        {
+            if (IsCredit)
+                await Purchases.CreateCreditAsync(Current.Id, Current.UserId, form);
+            else
+                await Purchases.SaveBillAsync(Current.Id, Current.UserId, Id, form);
+            Navigation.NavigateTo($"admin/suppliers/{form.SupplierId}");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

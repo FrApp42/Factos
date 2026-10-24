@@ -1,0 +1,110 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "factos",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http"
+      ],
+      "port": 5221
+    },
+    {
+      "name": "factos-preview",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http",
+        "--artifacts-path",
+        "C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/c52b6bab-d2b8-4b8b-af5a-16a6fb7f3d18/scratchpad/artifacts-run",
+        "--",
+        "--urls",
+        "http://localhost:5222",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite",
+        "--ConnectionStrings:DefaultConnection=DataSource=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/c52b6bab-d2b8-4b8b-af5a-16a6fb7f3d18/scratchpad/preview.db",
+        "--Storage:UploadsPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/c52b6bab-d2b8-4b8b-af5a-16a6fb7f3d18/scratchpad/preview-uploads",
+        "--DataProtection:KeysPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/c52b6bab-d2b8-4b8b-af5a-16a6fb7f3d18/scratchpad/preview-keys"
+      ],
+      "port": 5222
+    },
+    {
+      "name": "factos-themes",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http",
+        "--artifacts-path",
+        "C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/a930d97d-d31d-4dd0-b437-850a3f64992c/scratchpad/artifacts-run",
+        "--",
+        "--urls",
+        "http://localhost:5224",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite",
+        "--ConnectionStrings:DefaultConnection=Data Source=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/a930d97d-d31d-4dd0-b437-850a3f64992c/scratchpad/theme-test.db",
+        "--Storage:UploadsPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/a930d97d-d31d-4dd0-b437-850a3f64992c/scratchpad/uploads",
+        "--DataProtection:KeysPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/a930d97d-d31d-4dd0-b437-850a3f64992c/scratchpad/keys",
+        "--Recurring:Enabled=false",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite"
+      ],
+      "port": 5224
+    },
+    {
+      "name": "factos-import",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http",
+        "--artifacts-path",
+        "C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/e016e3b4-244e-4e5a-8651-2af83c8cb329/scratchpad/artifacts-run",
+        "--",
+        "--urls",
+        "http://localhost:5225",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite",
+        "--ConnectionStrings:DefaultConnection=DataSource=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/e016e3b4-244e-4e5a-8651-2af83c8cb329/scratchpad/target.db",
+        "--Storage:UploadsPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/e016e3b4-244e-4e5a-8651-2af83c8cb329/scratchpad/uploads",
+        "--DataProtection:KeysPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/e016e3b4-244e-4e5a-8651-2af83c8cb329/scratchpad/keys",
+        "--Recurring:Enabled=false"
+      ],
+      "port": 5225
+    },
+    {
+      "name": "factos-purchases",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http",
+        "--artifacts-path",
+        "C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/9fbe3bfb-d8ba-42e9-a7ff-9297b23baaa3/scratchpad/preview/artifacts",
+        "--",
+        "--urls",
+        "http://localhost:5226",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite",
+        "--ConnectionStrings:DefaultConnection=DataSource=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/9fbe3bfb-d8ba-42e9-a7ff-9297b23baaa3/scratchpad/preview/preview.db",
+        "--Storage:UploadsPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/9fbe3bfb-d8ba-42e9-a7ff-9297b23baaa3/scratchpad/preview/uploads",
+        "--DataProtection:KeysPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/9fbe3bfb-d8ba-42e9-a7ff-9297b23baaa3/scratchpad/preview/keys",
+        "--Recurring:Enabled=false"
+      ],
+      "port": 5226
+    }
+  ]
+}

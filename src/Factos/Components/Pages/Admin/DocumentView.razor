@@ -1,0 +1,167 @@
+@page "/admin/invoices/{Id:int}/view"
+@page "/admin/estimates/{Id:int}/view"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>@Loc.F("{0} · Factos", d?.Number)</PageTitle>
+
+@if (d is null) { <p>@Loc.T("Chargement…")</p> return; }
+
+<div class="page-head no-print">
+    <h1>@d.Title @d.Number <StatusBadge Status="@d.Status" /> @if (d.PaidStatus is { } paid) { <StatusBadge Status="@paid" /> }</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        @if (!d.IsCreditNote)
+        {
+            <a class="btn btn-outline-primary" href="@($"{ListUrl}/{Id}/edit")">@Loc.T("Modifier")</a>
+        }
+        else if (d.RelatedInvoiceId is { } related)
+        {
+            <a class="btn btn-outline-secondary" href="admin/invoices/@related/view">@Loc.F("Voir la facture {0}", d.RelatedNumber)</a>
+        }
+        <a class="btn btn-outline-secondary" href="@($"{Kind}s/pdf/{d.UniqueHash}")" target="_blank">@Loc.T("Télécharger le PDF")</a>
+        <button class="btn btn-outline-primary" @onclick="() => sending = !sending">@Loc.T("Envoyer par e-mail")</button>
+        @if (IsInvoice)
+        {
+            @if (d.Status == Sales.Draft)
+            {
+                <button class="btn btn-outline-success" @onclick="MarkSent">@Loc.T("Marquer comme envoyée")</button>
+            }
+            @if (!d.IsCreditNote && d.Status != Sales.Draft && d.DueAmount > 0)
+            {
+                <a class="btn btn-success" href="admin/payments/create?invoice=@Id">@Loc.T("Enregistrer un paiement")</a>
+                <button class="btn btn-outline-warning" @onclick="() => crediting = !crediting">@Loc.T("Note de crédit")</button>
+            }
+        }
+        else
+        {
+            <button class="btn btn-success" @onclick="Convert">@Loc.T("Convertir en facture")</button>
+            @if (d.Status != Sales.Accepted) { <button class="btn btn-outline-success" @onclick="() => SetStatus(Sales.Accepted)">@Loc.T("Accepté")</button> }
+            @if (d.Status != Sales.Rejected) { <button class="btn btn-outline-danger" @onclick="() => SetStatus(Sales.Rejected)">@Loc.T("Refusé")</button> }
+            @if (d.Status == Sales.Draft) { <button class="btn btn-outline-secondary" @onclick="() => SetStatus(Sales.Sent)">@Loc.T("Marquer comme envoyé")</button> }
+        }
+        <button class="btn btn-outline-danger" @onclick="Delete">@Loc.T("Supprimer")</button>
+    </div>
+</div>
+
+@if (error is not null) { <div class="alert alert-danger no-print">@error</div> }
+
+@if (sending)
+{
+    <SendPanel D="d" OnClose="() => sending = false" OnSent="Load" />
+}
+
+@if (crediting)
+{
+    <CreditNotePanel D="d" OnClose="() => crediting = false" />
+}
+
+@if (IsInvoice && !d.IsCreditNote && d.Status != Sales.Draft)
+{
+    <ApplyCreditPanel D="d" OnApplied="Load" />
+}
+
+<DocumentSheet D="d" />
+
+@if (creditNotes.Count > 0)
+{
+    <h2 class="h5 mt-4 no-print">@Loc.T("Notes de crédit")</h2>
+    <table class="table no-print">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th>@Loc.T("Motif")</th><th class="money">@Loc.T("Montant")</th></tr></thead>
+        <tbody>
+            @foreach (var n in creditNotes) { <tr><td><a href="admin/invoices/@n.Id/view">@n.InvoiceNumber</a></td><td>@Current.Date(n.InvoiceDate)</td><td>@n.CreditReason</td><td class="money">@d.Money(n.Total)</td></tr> }
+        </tbody>
+    </table>
+}
+
+<MailHistory D="d" />
+
+@if (IsInvoice && payments.Count > 0)
+{
+    <h2 class="h5 mt-4 no-print">@Loc.T("Paiements")</h2>
+    <table class="table no-print">
+        <thead><tr><th>@Loc.T("Numéro")</th><th>@Loc.T("Date")</th><th class="money">@Loc.T("Montant")</th></tr></thead>
+        <tbody>
+            @foreach (var p in payments) { <tr><td><a href="admin/payments/@p.Id/view">@p.PaymentNumber</a></td><td>@Current.Date(p.PaymentDate)</td><td class="money">@d.Money(p.Amount)</td></tr> }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private bool IsInvoice => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("admin/invoices");
+    private string Kind => IsInvoice ? DocumentData.Invoice : DocumentData.Estimate;
+    private string ListUrl => IsInvoice ? "admin/invoices" : "admin/estimates";
+
+    private DocumentData? d;
+    private List<Payment> payments = [];
+    private string? error;
+    private bool sending, crediting;
+    private List<Invoice> creditNotes = [];
+
+    // Parameters, not init: navigating from an invoice to its credit note (same page,
+    // new id) reuses this component.
+    protected override async Task OnParametersSetAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        sending = crediting = false;
+        error = null;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        d = await DocumentData.LoadAsync(Dbs, Sales, Kind, Id, Current.Id);
+        if (d is null)
+        {
+            Navigation.NavigateTo(ListUrl);
+            return;
+        }
+        if (IsInvoice)
+        {
+            await using var db = Dbs.Create();
+            var paymentIds = await db.PaymentAllocations.Where(a => a.InvoiceId == Id).Select(a => a.PaymentId).ToListAsync();
+            payments = await db.Payments.Where(p => paymentIds.Contains(p.Id)).OrderBy(p => p.PaymentDate).ToListAsync();
+            creditNotes = await db.Invoices.Where(i => i.RelatedInvoiceId == Id && i.Type == CreditNotes.Type).OrderBy(i => i.Id).ToListAsync();
+        }
+    }
+
+    private async Task MarkSent()
+    {
+        await Sales.MarkInvoiceSentAsync(Current.Id, Id);
+        await Load();
+    }
+
+    private async Task SetStatus(string value)
+    {
+        await Sales.SetEstimateStatusAsync(Current.Id, Id, value);
+        await Load();
+    }
+
+    private async Task Convert()
+    {
+        var invoiceId = await Sales.ConvertEstimateAsync(Current.Id, Current.UserId, Id);
+        Navigation.NavigateTo($"admin/invoices/{invoiceId}/edit");
+    }
+
+    private async Task Delete()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.F("Supprimer {0} ?", d!.Number)))
+            return;
+        try
+        {
+            if (IsInvoice)
+                await Sales.DeleteInvoiceAsync(Current.Id, Id);
+            else
+                await Sales.DeleteEstimateAsync(Current.Id, Id);
+            Navigation.NavigateTo(ListUrl);
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

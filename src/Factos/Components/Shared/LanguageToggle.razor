@@ -1,0 +1,8 @@
+@* A GET form: always a full page load, which is what a new culture needs (the endpoint is in Program.cs). *@
+<form action="language/@Other" method="get" class="m-0">
+    <button type="submit" class="btn btn-sm btn-outline-secondary" lang="@Other" title="@Loc.T("Changer de langue")" aria-label="@Loc.T("Changer de langue")">@Other.ToUpperInvariant()</button>
+</form>
+
+@code {
+    private static string Other => Loc.Lang == "en" ? "fr" : "en";
+}

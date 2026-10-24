@@ -1,0 +1,120 @@
+@page "/admin/expenses/create"
+@page "/admin/expenses/{Id:int}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+@inject Sales Sales
+
+<PageTitle>@Loc.T("Dépense · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? Loc.T("Nouvelle dépense") : Loc.T("Modifier la dépense"))</h1></div>
+
+@if (expense is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+@if (categories.Count == 0)
+{
+    <div class="alert alert-warning">@Loc.T("Créez d'abord une catégorie de dépense dans") <a href="admin/settings">@Loc.T("Paramètres")</a>.</div>
+}
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Catégorie *")</span>
+        <InputSelect class="form-select" @bind-Value="expense.ExpenseCategoryId">
+            <option value="0">@Loc.T("— Choisir —")</option>
+            @foreach (var c in categories) { <option value="@c.Id">@c.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Date *")</span><InputDate class="form-control" @bind-Value="expense.ExpenseDate" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Montant ({0}) *", Current.Currency?.Code)</span><InputNumber class="form-control" step="0.01" @bind-Value="amount" /></label></div>
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Client (refacturable)")</span>
+        <InputSelect class="form-select" @bind-Value="expense.CustomerId">
+            <option value="">—</option>
+            @foreach (var c in customers) { <option value="@c.Id">@c.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Moyen de paiement")</span>
+        <InputSelect class="form-select" @bind-Value="expense.PaymentMethodId">
+            <option value="">—</option>
+            @foreach (var m in methods) { <option value="@m.Id">@m.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span><InputTextArea class="form-control" rows="3" @bind-Value="expense.Notes" /></label></div>
+</div></div>
+
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
+    @if (Id is not null) { <button class="btn btn-outline-primary" @onclick="ToggleSend">@Loc.T("Envoyer par e-mail")</button> }
+    <a class="btn btn-outline-secondary" href="admin/expenses">@Loc.T("Annuler")</a>
+</div>
+
+@if (sendData is not null)
+{
+    <SendPanel D="sendData" OnClose="() => sendData = null" />
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private Expense? expense;
+    private decimal amount;
+    private List<ExpenseCategory> categories = [];
+    private List<Customer> customers = [];
+    private List<PaymentMethod> methods = [];
+    private string? error;
+    private DocumentData? sendData;
+
+    // Sends the saved expense: unsaved edits are not part of the e-mail.
+    private async Task ToggleSend()
+        => sendData = sendData is null ? await DocumentData.LoadAsync(Dbs, Sales, DocumentData.Expense, Id!.Value, Current.Id) : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        categories = await db.ExpenseCategories.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+        customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
+        methods = await db.PaymentMethods.Where(m => m.CompanyId == Current.Id).OrderBy(m => m.Name).ToListAsync();
+        expense = Id is { } id
+            ? await db.Expenses.SingleAsync(e => e.Id == id && e.CompanyId == Current.Id)
+            : new Expense { ExpenseDate = DateOnly.FromDateTime(DateTime.Today), ExpenseCategoryId = categories.FirstOrDefault()?.Id ?? 0 };
+        amount = Money.ToMajor(expense.Amount);
+    }
+
+    private async Task Save()
+    {
+        if (categories.All(c => c.Id != expense!.ExpenseCategoryId))
+        {
+            error = Loc.T("La catégorie est obligatoire.");
+            return;
+        }
+        if (amount <= 0)
+        {
+            error = Loc.T("Le montant doit être positif.");
+            return;
+        }
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        expense!.Amount = Money.ToCents(amount);
+        // Recorded in the company currency, so the base amount equals the amount.
+        expense.CurrencyId = Current.Currency?.Id;
+        expense.ExchangeRate = 1;
+        expense.BaseAmount = expense.Amount;
+        expense.UpdatedAt = now;
+        if (expense.Id == 0)
+        {
+            expense.CompanyId = Current.Id;
+            expense.CreatorId = Current.UserId;
+            expense.CreatedAt = now;
+            db.Expenses.Add(expense);
+        }
+        else
+        {
+            db.Expenses.Update(expense);
+        }
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("admin/expenses");
+    }
+}

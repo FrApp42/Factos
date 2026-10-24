@@ -1,0 +1,63 @@
+@* Settles an invoice with the unallocated part of the customer's earlier payments. *@
+@inject Sales Sales
+@inject CurrentCompany Current
+
+@if (credits is { Count: > 0 } && D.DueAmount > 0)
+{
+    <div class="card mb-3 no-print border-success">
+        <div class="card-body">
+            <h2 class="h6">Avoir disponible pour ce client : @D.Money(credits.Sum(c => c.Available))</h2>
+            @if (error is not null) { <div class="alert alert-danger">@error</div> }
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Paiement d'origine")</span>
+                        <select class="form-select" @bind="paymentId">
+                            @foreach (var (payment, available) in credits)
+                            {
+                                <option value="@payment.Id">@Loc.F("{0} — {1} — reste {2}", payment.PaymentNumber, Current.Date(payment.PaymentDate), D.Money(available))</option>
+                            }
+                        </select></label>
+                </div>
+                <div class="col-md-3">
+                    <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Montant à appliquer")</span>
+                        <input type="number" step="0.01" class="form-control" @bind="amount" /></label>
+                </div>
+                <div class="col-md-4"><button class="btn btn-success" @onclick="Apply">@Loc.T("Appliquer l'avoir")</button></div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public DocumentData D { get; set; } = default!;
+    [Parameter] public EventCallback OnApplied { get; set; }
+
+    private List<(Payment Payment, long Available)>? credits;
+    private long paymentId;
+    private decimal amount;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        credits = await Sales.AvailableCreditsAsync(Current.Id, D.Customer.Id);
+        if (credits.Count > 0)
+        {
+            paymentId = credits[0].Payment.Id;
+            amount = Money.ToMajor(Math.Min(credits[0].Available, D.DueAmount));
+        }
+    }
+
+    private async Task Apply()
+    {
+        error = null;
+        try
+        {
+            await Sales.ApplyCreditAsync(Current.Id, paymentId, (int)D.Id, Money.ToCents(amount));
+            await OnApplied.InvokeAsync();
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

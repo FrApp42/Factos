@@ -1,0 +1,13 @@
+services:
+  factos:
+    build: .
+    image: ghcr.io/anthodingo/factos:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - factos-data:/app/App_Data
+    # The /setup wizard stops the process once done: the restart brings the app up installed.
+    restart: unless-stopped
+
+volumes:
+  factos-data:

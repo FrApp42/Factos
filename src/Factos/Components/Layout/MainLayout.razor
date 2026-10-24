@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 gap-3">
+            <Factos.Components.Shared.LanguageToggle />
+            <Factos.Components.Shared.ModeToggle />
+            <AuthorizeView>
+                <Authorized>
+                    <Factos.Components.Shared.CompanySwitcher />
+                    <a class="small" href="admin/profile">@context.User.Identity?.Name</a>
+                    <form action="Account/Logout" method="post" class="m-0">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="Account/Login" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Déconnexion")</button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4 py-3">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    @Loc.T("Une erreur inattendue est survenue.")
+    <a href="." class="reload">@Loc.T("Recharger")</a>
+    <span class="dismiss">🗙</span>
+</div>

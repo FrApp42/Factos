@@ -1,0 +1,185 @@
+@page "/admin/dashboard"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+
+<PageTitle>@Loc.T("Tableau de bord · Factos")</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>@Greeting, @FirstName</h1>
+        <div class="text-muted small">@Current.Company.Name · @Current.Date(today)</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" href="admin/customers/create">@Loc.T("+ Client")</a>
+        <a class="btn btn-outline-secondary" href="admin/payments/create">@Loc.T("+ Paiement")</a>
+        <a class="btn btn-outline-primary" href="admin/estimates/create">@Loc.T("+ Devis")</a>
+        <a class="btn btn-primary" href="admin/invoices/create">@Loc.T("+ Facture")</a>
+    </div>
+</div>
+
+@if (!loaded) { <p>@Loc.T("Chargement…")</p> return; }
+
+@if (Steps.Any(s => !s.Done))
+{
+    <div class="card mb-4 border-primary-subtle"><div class="card-body">
+        <h2 class="h6">@Loc.T("Bien démarrer")</h2>
+        <p class="text-muted small">@Loc.T("Quelques étapes pour émettre votre première facture.")</p>
+        <ol class="list-unstyled mb-0 d-grid gap-2">
+            @foreach (var s in Steps)
+            {
+                <li class="d-flex align-items-center gap-2">
+                    <span class="step-mark @(s.Done ? "done" : "")" aria-hidden="true">@(s.Done ? "✓" : "")</span>
+                    @if (s.Done) { <span class="text-muted text-decoration-line-through">@s.Label</span><span class="visually-hidden">@Loc.T("(fait)")</span> }
+                    else { <a href="@s.Href">@s.Label</a> }
+                </li>
+            }
+        </ol>
+    </div></div>
+}
+
+<div class="row g-3 mb-4">
+    @foreach (var s in Stats)
+    {
+        <div class="col-sm-6 col-lg-3">
+            <a class="card stat-card text-decoration-none h-100" href="@s.Href"><div class="card-body">
+                <div class="text-muted small">@s.Label</div>
+                <div class="value text-body">@s.Value</div>
+                <div class="small @(s.Alert ? "text-danger" : "text-muted")">@s.Hint</div>
+            </div></a>
+        </div>
+    }
+</div>
+
+<CashflowChart Data="cashflow" Type="@chartType" TypeChanged="SaveChartTypeAsync" />
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <h2 class="h6">@Loc.T("Factures à encaisser")</h2>
+                <a class="small" href="admin/invoices">@Loc.T("Voir tout")</a>
+            </div>
+            @if (dueInvoices.Count == 0) { <p class="text-muted small mb-0">@Loc.T("Aucune facture en attente de paiement.")</p> }
+            else
+            {
+                <table class="table table-sm mb-0">
+                    @foreach (var i in dueInvoices)
+                    {
+                        var late = IsLate(i);
+                        <tr>
+                            <td><a href="admin/invoices/@i.Id/view">@i.InvoiceNumber</a><div class="small text-muted">@CustomerName(i.CustomerId)</div></td>
+                            <td class="@(late ? "text-danger" : "")">@Current.Date(i.DueDate)@if (late) { <div class="small">@Loc.T("en retard")</div> }</td>
+                            <td><StatusBadge Status="@i.PaidStatus" /></td>
+                            <td class="money">@Current.Money(i.BaseDueAmount ?? i.DueAmount)</td>
+                        </tr>
+                    }
+                </table>
+            }
+        </div></div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <h2 class="h6">@Loc.T("Derniers devis")</h2>
+                <a class="small" href="admin/estimates">@Loc.T("Voir tout")</a>
+            </div>
+            @if (estimates.Count == 0) { <p class="text-muted small mb-0">@Loc.T("Aucun devis pour l'instant.") <a href="admin/estimates/create">@Loc.T("Créer un devis")</a></p> }
+            else
+            {
+                <table class="table table-sm mb-0">
+                    @foreach (var e in estimates)
+                    {
+                        <tr>
+                            <td><a href="admin/estimates/@e.Id/view">@e.EstimateNumber</a><div class="small text-muted">@CustomerName(e.CustomerId)</div></td>
+                            <td>@Current.Date(e.EstimateDate)</td>
+                            <td><StatusBadge Status="@e.Status" /></td>
+                            <td class="money">@Current.Money(e.BaseTotal ?? e.Total)</td>
+                        </tr>
+                    }
+                </table>
+            }
+        </div></div>
+    </div>
+</div>
+
+@code {
+    private record Stat(string Label, string Value, string Hint, string Href, bool Alert = false);
+    private record Step(string Label, string Href, bool Done);
+
+    private bool loaded;
+    private DateOnly today;
+    private int hour;
+    private Stat[] Stats = [];
+    private Step[] Steps = [];
+    private List<Invoice> dueInvoices = [];
+    private List<Estimate> estimates = [];
+    private Dictionary<long, string> customers = [];
+    private Cashflow.Series cashflow = null!;
+    private string chartType = "area";
+    private const string ChartKey = "dashboard_chart";
+
+    private string FirstName => Current.UserName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+    private string Greeting => hour >= 18 ? "Bonsoir" : "Bonjour";
+    private bool IsLate(Invoice i) => i.DueDate < today;
+    private string CustomerName(long? id) => id is { } c ? customers.GetValueOrDefault(c, "") : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Cadence.Zone(Current.Setting("time_zone")));
+        (today, hour) = (DateOnly.FromDateTime(now), now.Hour);
+        await using var db = Dbs.Create();
+        var id = Current.Id;
+        var invoices = db.Invoices.Where(i => i.CompanyId == id && i.Type == "INVOICE");
+        var issued = invoices.Where(i => i.Status != Sales.Draft);
+        var unpaid = issued.Where(i => i.DueAmount > 0);
+
+        var sales = await issued.SumAsync(i => (long?)(i.BaseTotal ?? i.Total)) ?? 0;
+        var due = await issued.SumAsync(i => (long?)(i.BaseDueAmount ?? i.DueAmount)) ?? 0;
+        var late = await unpaid.Where(i => i.DueDate < today).SumAsync(i => (long?)(i.BaseDueAmount ?? i.DueAmount)) ?? 0;
+        var receipts = await db.Payments.Where(p => p.CompanyId == id).SumAsync(p => (long?)(p.BaseAmount ?? p.Amount)) ?? 0;
+        var spent = await db.Expenses.Where(e => e.CompanyId == id).SumAsync(e => (long?)(e.BaseAmount ?? e.Amount)) ?? 0;
+        var issuedCount = await issued.CountAsync();
+        var unpaidCount = await unpaid.CountAsync();
+
+        Stats =
+        [
+            new(Loc.T("Ventes facturées"), Current.Money(sales), Plural(issuedCount, Loc.T("facture émise"), Loc.T("factures émises")), "admin/invoices"),
+            new("Encaissements", Current.Money(receipts), Loc.T("paiements reçus"), "admin/payments"),
+            new(Loc.T("Reste à encaisser"), Current.Money(due),
+                late > 0 ? $"dont {Current.Money(late)} en retard" : Plural(unpaidCount, "facture en attente", "factures en attente"),
+                "admin/invoices", late > 0),
+            new(Loc.T("Dépenses"), Current.Money(spent), Loc.F("résultat : {0}", Current.Money(receipts - spent)), "admin/expenses"),
+        ];
+
+        Steps =
+        [
+            new(Loc.T("Compléter les informations de la société"), "admin/settings", await db.Addresses.AnyAsync(a => a.CompanyId == id && a.CustomerId == null && a.UserId == null && (a.AddressStreet1 != null && a.AddressStreet1 != "" || a.City != null && a.City != ""))),
+            new(Loc.T("Ajouter un premier client"), "admin/customers/create", await db.Customers.AnyAsync(c => c.CompanyId == id)),
+            new(Loc.T("Créer un article ou une prestation"), "admin/items/create", await db.Items.AnyAsync(i => i.CompanyId == id)),
+            new(Loc.T("Émettre une première facture"), "admin/invoices/create", await invoices.AnyAsync()),
+        ];
+
+        dueInvoices = await unpaid.OrderBy(i => i.DueDate).Take(8).ToListAsync();
+        estimates = await db.Estimates.Where(e => e.CompanyId == id).OrderByDescending(e => e.EstimateDate).ThenByDescending(e => e.Id).Take(8).ToListAsync();
+        var customerIds = dueInvoices.Select(i => i.CustomerId).Concat(estimates.Select(e => e.CustomerId)).OfType<long>().Distinct().ToList();
+        customers = await db.Customers.Where(c => customerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name);
+        cashflow = await Cashflow.FiscalYearAsync(db, id, Current.Setting("fiscal_year"), today);
+        // Réglage utilisateur, comme upstream : le choix suit l'utilisateur d'un appareil à l'autre
+        chartType = await db.UserSettings.AnyAsync(s => s.UserId == Current.UserId && s.Key == ChartKey && s.Value == "bars") ? "bars" : "area";
+        loaded = true;
+    }
+
+    private async Task SaveChartTypeAsync(string type)
+    {
+        chartType = type;
+        await using var db = Dbs.Create();
+        var row = await db.UserSettings.FirstOrDefaultAsync(s => s.UserId == Current.UserId && s.Key == ChartKey);
+        if (row is null) db.UserSettings.Add(row = new UserSetting { UserId = Current.UserId, Key = ChartKey, CreatedAt = Data.Timestamp.Now() });
+        row.Value = type;
+        row.UpdatedAt = Data.Timestamp.Now();
+        await db.SaveChangesAsync();
+    }
+
+    private static string Plural(int n, string one, string many) => $"{n} {(n > 1 ? many : one)}";
+}

@@ -1,0 +1,75 @@
+@page "/admin/items/create"
+@page "/admin/items/{Id:int}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Article · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? "Nouvel article" : Loc.T("Modifier l'article"))</h1></div>
+
+@if (item is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span><InputText class="form-control" @bind-Value="item.Name" /></label></div>
+    <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Prix ({0})", Current.Currency?.Code)</span><InputNumber class="form-control" @bind-Value="price" step="0.01" /></label></div>
+    <div class="col-md-3">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Unité")</span>
+        <InputSelect class="form-select" @bind-Value="item.UnitId">
+            <option value="">—</option>
+            @foreach (var u in units) { <option value="@u.Id">@u.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Description")</span><InputTextArea class="form-control" rows="3" @bind-Value="item.Description" /></label></div>
+</div></div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="admin/items">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private Item? item;
+    private decimal price;
+    private List<Unit> units = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        units = await db.Units.Where(u => u.CompanyId == Current.Id).OrderBy(u => u.Name).ToListAsync();
+        item = Id is { } id ? await db.Items.SingleAsync(i => i.Id == id && i.CompanyId == Current.Id) : new Item();
+        price = Money.ToMajor(item.Price);
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(item!.Name))
+        {
+            error = Loc.T("Le nom est obligatoire.");
+            return;
+        }
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        item.Price = Money.ToCents(price);
+        item.UpdatedAt = now;
+        if (item.Id == 0)
+        {
+            item.CompanyId = Current.Id;
+            item.CreatorId = Current.UserId;
+            item.CurrencyId = Current.Currency?.Id;
+            item.CreatedAt = now;
+            db.Items.Add(item);
+        }
+        else
+        {
+            db.Items.Update(item);
+        }
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("admin/items");
+    }
+}

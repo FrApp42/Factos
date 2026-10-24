@@ -1,0 +1,851 @@
+@page "/admin/settings"
+@using AnthoDingo.Setup
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject IJSRuntime JS
+@inject Mailer Mailer
+@inject Logos Logos
+@inject AppUpdates Updates
+
+<PageTitle>@Loc.T("Paramètres · Factos")</PageTitle>
+
+<div class="page-head"><h1>@Loc.T("Paramètres")</h1><a class="btn btn-outline-primary" href="admin/companies/create">@Loc.T("+ Nouvelle société")</a></div>
+
+@if (!loaded) { <p>@Loc.T("Chargement…")</p> return; }
+@if (!isOwner)
+{
+    <div class="alert alert-warning">@Loc.T("Seul le propriétaire de la société peut modifier ses paramètres.")</div>
+    return;
+}
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var (key, label) in isSuperAdmin ? [.. Tabs, ("appearance", "Apparence"), ("import", Loc.T("Import InvoiceShelf")), ("updates", Loc.T("Mises à jour"))] : Tabs)
+    {
+        <li class="nav-item"><button class="nav-link @(tab == key ? "active" : "")" @onclick="() => Select(key)">@Loc.T(label)</button></li>
+    }
+</ul>
+
+@if (message is not null) { <div class="alert alert-success">@message</div> }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+@switch (tab)
+{
+    case "company":
+        <div class="card mb-3"><div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            @if (!string.IsNullOrEmpty(company.Logo))
+            {
+                <img src="/logos/@company.UniqueHash?v=@logoVersion" alt="Logo de @company.Name" style="max-height:60px;max-width:220px" />
+            }
+            else
+            {
+                <span class="text-muted">@Loc.T("Aucun logo")</span>
+            }
+            <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Logo (PNG, JPEG ou GIF, 2 Mo max.)")</span>
+                <InputFile class="form-control" accept="image/png,image/jpeg,image/gif" OnChange="UploadLogo" /></label>
+            @if (!string.IsNullOrEmpty(company.Logo))
+            {
+                <button class="btn btn-outline-danger align-self-end" @onclick="RemoveLogo">@Loc.T("Retirer le logo")</button>
+            }
+        </div></div>
+        <div class="card"><div class="card-body row g-3">
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom de la société *")</span><InputText class="form-control" @bind-Value="company.Name" /></label></div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("N° de TVA")</span><InputText class="form-control" @bind-Value="company.VatId" /></label></div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("N° fiscal / SIRET")</span><InputText class="form-control" @bind-Value="company.TaxId" /></label></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Adresse")</span><InputText class="form-control" @bind-Value="address.AddressStreet1" /></label></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Complément")</span><InputText class="form-control" @bind-Value="address.AddressStreet2" /></label></div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Code postal")</span><InputText class="form-control" @bind-Value="address.Zip" /></label></div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Ville")</span><InputText class="form-control" @bind-Value="address.City" /></label></div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Téléphone")</span><InputText class="form-control" @bind-Value="address.Phone" /></label></div>
+            <div class="col-md-3">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Pays")</span>
+                <InputSelect class="form-select" @bind-Value="address.CountryId">
+                    <option value="">—</option>
+                    @foreach (var c in countries) { <option value="@c.Id">@c.Name</option> }
+                </InputSelect></label>
+            </div>
+            <div class="col-12"><button class="btn btn-primary" @onclick="SaveCompany">@Loc.T("Enregistrer")</button></div>
+        </div></div>
+        break;
+
+    case "preferences":
+        <div class="card"><div class="card-body row g-3">
+            <div class="col-md-4">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Devise de la société")</span>
+                <select class="form-select" @bind="prefs.Currency" disabled="@hasTransactions">
+                    @foreach (var c in currencies) { <option value="@c.Id">@c.Code — @c.Name</option> }
+                </select></label>
+                @if (hasTransactions) { <div class="form-text">@Loc.T("Figée : la société a déjà des opérations.")</div> }
+            </div>
+            <div class="col-md-4">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Format de date")</span>
+                <select class="form-select" @bind="prefs.DateFormat">
+                    @foreach (var (carbon, _) in DateFormats) { <option value="@carbon">@Factos.Api.PhpDate.Format(DateTime.Today, carbon)</option> }
+                </select></label>
+            </div>
+            <div class="col-md-4">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Fuseau horaire")</span>
+                    <select class="form-select" @bind="prefs.TimeZone">
+                        @foreach (var zone in TimeZones) { <option value="@zone">@zone</option> }
+                    </select></label>
+            </div>
+            <div class="col-md-4 d-flex flex-column justify-content-end">
+                <div class="form-check form-switch"><input class="form-check-input" role="switch" type="checkbox" id="tpi" @bind="prefs.TaxPerItem" /><label class="form-check-label" for="tpi">@Loc.T("Taxes par ligne")</label></div>
+                <div class="form-check form-switch"><input class="form-check-input" role="switch" type="checkbox" id="dpi" @bind="prefs.DiscountPerItem" /><label class="form-check-label" for="dpi">@Loc.T("Remises par ligne")</label></div>
+            </div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Échéance facture (jours)")</span><input type="number" class="form-control" @bind="prefs.DueDays" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Validité devis (jours)")</span><input type="number" class="form-control" @bind="prefs.ExpiryDays" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Format n° facture")</span><input class="form-control font-monospace" @bind="prefs.InvoiceFormat" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Format n° devis")</span><input class="form-control font-monospace" @bind="prefs.EstimateFormat" /></label></div>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Format n° paiement")</span><input class="form-control font-monospace" @bind="prefs.PaymentFormat" /></label></div>
+            <div class="col-12 form-text">Jetons : {{SERIES:INV}} {{DELIMITER:-}} {{SEQUENCE:6}} {{DATE_FORMAT:Y}} {{CUSTOMER_SERIES}} {{CUSTOMER_SEQUENCE:4}} {{RANDOM_SEQUENCE:6}}</div>
+            <div class="col-12"><button class="btn btn-primary" @onclick="SavePreferences">@Loc.T("Enregistrer")</button></div>
+        </div></div>
+        break;
+
+    case "taxes":
+        <div class="card mb-3"><div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>@Loc.T("Nom")</th><th>@Loc.T("Usage")</th><th>@Loc.T("Taux")</th><th>@Loc.T("Composée")</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var t in taxTypes)
+                    {
+                        <tr><td>@t.Name</td><td>@(t.TransactionType == "purchases" ? "Achats" : Loc.T("Ventes"))</td><td>@(t.CalculationType == "fixed" ? Current.Money(t.FixedAmount ?? 0) : $"{t.Percent:0.##} %")</td><td>@(t.CompoundTax != 0 ? "Oui" : "")</td>
+                            <td class="text-end"><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTax(t)">@Loc.T("Supprimer")</button></td></tr>
+                    }
+                </tbody>
+            </table>
+        </div></div>
+        <div class="card"><div class="card-body row g-2 align-items-end">
+            <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span><input class="form-control" @bind="newTax.Name" /></label></div>
+            <div class="col-md-2">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Usage")</span>
+                <select class="form-select" @bind="newTax.TransactionType"><option value="sales">@Loc.T("Ventes")</option><option value="purchases">@Loc.T("Achats")</option></select></label>
+            </div>
+            <div class="col-md-2">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Type")</span>
+                <select class="form-select" @bind="newTax.CalculationType"><option value="percentage">@Loc.T("Pourcentage")</option><option value="fixed">@Loc.T("Montant fixe")</option></select></label>
+            </div>
+            <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@(newTax.CalculationType == "fixed" ? Loc.T("Montant") : "Taux (%)")</span><input type="number" step="0.01" class="form-control" @bind="newTaxValue" /></label></div>
+            <div class="col-md-2"><div class="form-check form-switch"><input class="form-check-input" role="switch" type="checkbox" id="cmp" @bind="newTaxCompound" /><label class="form-check-label" for="cmp">@Loc.T("Composée")</label></div></div>
+            <div class="col-md-2"><button class="btn btn-primary" @onclick="AddTax">@Loc.T("Ajouter")</button></div>
+        </div></div>
+        break;
+
+    case "emails":
+        <div class="card mb-3"><div class="card-body row g-3">
+            <h2 class="h6 col-12 m-0">@Loc.T("Serveur d'envoi (SMTP)")</h2>
+            <div class="col-12 form-check form-switch ms-2">
+                <input class="form-check-input" role="switch" type="checkbox" id="smtpOn" @bind="smtpEnabled" />
+                <label class="form-check-label" for="smtpOn">@Loc.T("Utiliser le serveur SMTP de cette société")</label>
+                <div class="form-text">@Loc.T("Sinon, la configuration globale de l'installation (section") <code>@Loc.T("Mail")</code>@Loc.T(") est utilisée si elle existe.")</div>
+            </div>
+            <div class="col-md-5"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Serveur *")</span><input class="form-control" @bind="smtp.Host" placeholder="smtp.exemple.fr" /></label></div>
+            <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Port *")</span><input type="number" class="form-control" @bind="smtp.Port" /></label></div>
+            <div class="col-md-5">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Chiffrement")</span>
+                    <select class="form-select" @bind="smtp.Encryption">
+                        <option value="tls">@Loc.T("STARTTLS (port 587)")</option>
+                        <option value="ssl">@Loc.T("SSL/TLS (port 465)")</option>
+                        <option value="none">@Loc.T("Aucun")</option>
+                    </select></label>
+            </div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Identifiant")</span><input class="form-control" @bind="smtp.Username" autocomplete="off" /></label></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Mot de passe {0}", (hasPassword ? "(laisser vide pour conserver)" : ""))</span>
+                <input type="password" class="form-control" @bind="smtp.Password" autocomplete="new-password" /></label></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom de l'expéditeur *")</span><input class="form-control" @bind="smtp.FromName" /></label></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Adresse de l'expéditeur *")</span><input type="email" class="form-control" @bind="smtp.FromMail" /></label></div>
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveSmtp">@Loc.T("Enregistrer")</button>
+                <button class="btn btn-outline-secondary" disabled="@testing" @onclick="TestSmtp">@(testing ? Loc.T("Envoi…") : "Envoyer un e-mail de test")</button>
+            </div>
+        </div></div>
+        <div class="card"><div class="card-body row g-3">
+            <h2 class="h6 col-12 m-0">@Loc.T("Contenu des e-mails")</h2>
+            @foreach (var (kind, label) in MailKinds)
+            {
+                <div class="col-12">
+                    <div class="form-check form-switch mb-1">
+                        <input class="form-check-input" role="switch" type="checkbox" id="enabled-@kind" @bind="mailEnabled[kind]" />
+                        <label class="form-check-label" for="enabled-@kind">@Loc.F("Autoriser l'envoi par e-mail — {0}", label)</label>
+                    </div>
+                    <label class="d-block mb-0"><span class="form-label d-block">@Loc.F("Message par défaut — {0}", label)</span>
+                        <textarea class="form-control" rows="3" @bind="mailBodies[kind]"></textarea></label>
+                    <div class="form-check form-switch mt-1">
+                        <input class="form-check-input" role="switch" type="checkbox" id="attach-@kind" @bind="attachments[kind]" />
+                        <label class="form-check-label" for="attach-@kind">@Loc.T("Joindre le PDF (sinon : lien vers le document en ligne)")</label>
+                    </div>
+                </div>
+            }
+            <div class="col-12 form-text">Variables : {CONTACT_DISPLAY_NAME}, {PRIMARY_CONTACT_NAME}, {COMPANY_NAME}, {INVOICE_NUMBER}, {INVOICE_DUE_DATE}, {ESTIMATE_NUMBER}, {PAYMENT_AMOUNT}, {EXPENSE_AMOUNT}, {EXPENSE_CATEGORY}…</div>
+            <div class="col-md-6 form-check form-switch ms-2">
+                <input class="form-check-input" role="switch" type="checkbox" id="expire" @bind="expireLinks" />
+                <label class="form-check-label" for="expire">@Loc.T("Faire expirer les liens envoyés aux clients")</label>
+            </div>
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Validité des liens (jours)")</span><input type="number" class="form-control" @bind="linkDays" disabled="@(!expireLinks)" /></label></div>
+            <div class="col-12 form-check form-switch ms-2">
+                <input class="form-check-input" role="switch" type="checkbox" id="mailTracking" @bind="mailTracking" />
+                <label class="form-check-label" for="mailTracking">@Loc.T("Suivi du mail")</label>
+            </div>
+            <div class="col-12"><button class="btn btn-primary" @onclick="SaveMailContent">@Loc.T("Enregistrer")</button></div>
+        </div></div>
+        break;
+
+    case "templates":
+        <TemplateDesigner />
+        break;
+
+    case "appearance":
+        <div class="card"><div class="card-body row g-3">
+            <p class="col-12 text-muted small m-0">Réglages de l'instance, communs à toutes les sociétés. Chaque utilisateur peut choisir le sien dans Mon profil ; le mode clair ou sombre suit le système.</p>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Thème par défaut des utilisateurs")</span>
+                <select class="form-select" @bind="defaultTheme">
+                    @foreach (var t in Themes.All) { <option value="@t.Key">@Loc.T(t.Label)</option> }
+                </select></label>
+                <div class="form-text">@Loc.T("Pour les nouveaux utilisateurs et ceux qui n'ont pas choisi de thème.")</div></div>
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Thème de la page de connexion")</span>
+                <select class="form-select" @bind="loginTheme">
+                    @foreach (var t in Themes.All) { <option value="@t.Key">@Loc.T(t.Label)</option> }
+                </select></label></div>
+            <div class="col-12"><button class="btn btn-primary" @onclick="SaveAppearance">@Loc.T("Enregistrer")</button></div>
+        </div></div>
+        break;
+
+    case "import":
+        @if (importReport is not null)
+        {
+            <div class="card"><div class="card-body">
+                <p>@Loc.T("Les données de Factos ont été remplacées par celles d'InvoiceShelf. Reconnectez-vous avec un compte InvoiceShelf (même mot de passe).")</p>
+                <form action="Account/Logout" method="post" class="mb-3">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="Account/Login" />
+                    <button type="submit" class="btn btn-primary">@Loc.T("Se reconnecter")</button>
+                </form>
+                <ul class="small text-muted mb-0">@foreach (var line in importReport) { <li>@line</li> }</ul>
+            </div></div>
+        }
+        else if (importCounts is null)
+        {
+        <div class="card"><div class="card-body row g-3">
+            <p class="col-12 text-muted small m-0">@Loc.T("Copie une base InvoiceShelf (à jour) dans cette installation.") <strong>@Loc.T("Toutes les données de Factos sont remplacées")</strong>@Loc.T(", comptes compris : l'import n'est possible que tant qu'aucun client, article, devis, facture, paiement ni dépense n'a été saisi. Les logos ne sont pas copiés.")</p>
+            <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Base de données")</span>
+                <select class="form-select" @bind="importSource.Provider" @bind:after="ImportProviderChanged">
+                    <option value="@DbProvider.MySql">@Loc.T("MySQL / MariaDB")</option>
+                    <option value="@DbProvider.Postgres">PostgreSQL</option>
+                    <option value="@DbProvider.Sqlite">SQLite</option>
+                </select></label></div>
+            @if (importSource.Provider == DbProvider.Sqlite)
+            {
+                <div class="col-md-8"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Chemin du fichier sur le serveur")</span>
+                    <input class="form-control" @bind="importSource.Host" placeholder="/var/www/invoiceshelf/database/database.sqlite" /></label></div>
+            }
+            else
+            {
+                <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Serveur")</span><input class="form-control" @bind="importSource.Host" /></label></div>
+                <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Port")</span><input type="number" class="form-control" @bind="importSource.Port" /></label></div>
+                <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Base")</span><input class="form-control" @bind="importSource.Database" /></label></div>
+                <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Utilisateur")</span><input class="form-control" @bind="importSource.User" autocomplete="off" /></label></div>
+                <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Mot de passe")</span><input type="password" class="form-control" @bind="importSource.Password" autocomplete="new-password" /></label></div>
+            }
+            <div class="col-12"><button class="btn btn-primary" disabled="@importing" @onclick="AnalyzeImport">@(importing ? Loc.T("Lecture de la base…") : "Analyser la base")</button></div>
+        </div></div>
+        }
+        else
+        {
+        <div class="card"><div class="card-body row g-3">
+            <p class="col-12 m-0">@Loc.F("Base InvoiceShelf lue : {0} société(s), {1} utilisateur(s). Comptes, sociétés et réglages (taxes, unités, moyens de paiement, catégories de dépenses, champs personnalisés) sont toujours importés.", importCounts["companies"], importCounts["users"])</p>
+            <fieldset class="col-12">
+                <legend class="form-label">@Loc.T("Données à importer")</legend>
+                @foreach (var category in InvoiceShelfImport.Categories)
+                {
+                    var required = InvoiceShelfImport.Categories.Any(c => importSelected.Contains(c.Key) && c.Requires.Contains(category.Key));
+                    <label class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" role="switch" checked="@(required || importSelected.Contains(category.Key))" disabled="@required"
+                               @onchange="() => ToggleImportCategory(category.Key)" />
+                        <span class="form-check-label">@Loc.T(category.Label) (@importCounts[category.Key])@(required ? Loc.T(" — requis par la sélection") : "")</span>
+                    </label>
+                }
+            </fieldset>
+            <div class="col-12"><label class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input" role="switch" @bind="importConfirmed" />
+                <span class="form-check-label">@Loc.T("Je comprends que les données actuelles de Factos seront supprimées.")</span></label></div>
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-danger" disabled="@(!importConfirmed || importing)" @onclick="RunImport">@(importing ? Loc.T("Import en cours…") : Loc.T("Importer"))</button>
+                <button class="btn btn-outline-secondary" disabled="@importing" @onclick="ResetImport">@Loc.T("Changer de base")</button>
+            </div>
+        </div></div>
+        }
+        break;
+
+    case "updates":
+        <div class="card"><div class="card-body">
+            <p>@Loc.T("Version installée :") <strong>@AppUpdates.Current.ToString(3)</strong></p>
+            @if (checkingUpdates)
+            {
+                <p class="text-muted mb-0">@Loc.T("Recherche de mises à jour…")</p>
+            }
+            else if (latest?.Version is { } v && v > AppUpdates.Current)
+            {
+                <p>@Loc.T("Nouvelle version disponible :") <strong>@latest.TagName</strong>@(latest.PublishedAt is { } at ? $" ({at:dd/MM/yyyy})" : "") — <a href="@latest.HtmlUrl" target="_blank" rel="noopener">@Loc.T("notes de version")</a></p>
+                @if (!string.IsNullOrWhiteSpace(latest.Body)) { <pre class="small border rounded p-2" style="white-space:pre-wrap;max-height:16rem">@latest.Body</pre> }
+                <p class="text-muted small">L'application redémarre après l'installation ; les migrations de base de données sont ensuite proposées sur /update. Sauvegardez la base avant.</p>
+                <button class="btn btn-primary" disabled="@installing" @onclick="InstallUpdate">@(installing ? Loc.T("Installation en cours…") : Loc.T("Mettre à jour"))</button>
+            }
+            else
+            {
+                @if (updatesChecked) { <p class="mb-2">@Loc.T("Factos est à jour.")</p> }
+                <button class="btn btn-outline-primary" @onclick="CheckUpdates">@Loc.T("Rechercher les mises à jour")</button>
+            }
+        </div></div>
+        break;
+
+    default:
+        <div class="card mb-3"><ul class="list-group list-group-flush">
+            @foreach (var (id, name) in lookup)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">@name
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLookup(id)">@Loc.T("Supprimer")</button></li>
+            }
+        </ul></div>
+        <div class="input-group" style="max-width:30rem">
+            <input class="form-control" placeholder="@Loc.T("Nom")" @bind="newName" />
+            <button class="btn btn-primary" @onclick="AddLookup">@Loc.T("Ajouter")</button>
+        </div>
+        break;
+}
+
+@code {
+    private static readonly (string, string)[] Tabs =
+    [
+        ("company", "Société"), ("preferences", "Préférences"), ("taxes", "Taxes"),
+        ("methods", "Moyens de paiement"), ("units", "Unités"), ("categories", "Catégories de dépenses"), ("emails", "E-mails"), ("templates", "Modèles PDF"),
+    ];
+
+    /// DateFormatter::$formats, including upstream's leading space on ' YYYY/MM/DD'.
+    private static readonly (string Carbon, string Moment)[] DateFormats =
+    [
+        ("Y M d", "YYYY MMM DD"), ("d M Y", "DD MMM YYYY"), ("d/m/Y", "DD/MM/YYYY"), ("d.m.Y", "DD.MM.YYYY"),
+        ("d-m-Y", "DD-MM-YYYY"), ("m/d/Y", "MM/DD/YYYY"), ("Y/m/d", " YYYY/MM/DD"), ("Y-m-d", "YYYY-MM-DD"),
+    ];
+
+    private static string[] TimeZones => Cadence.TimeZones;
+
+    private class Preferences
+    {
+        public string Currency { get; set; } = "";
+        public string DateFormat { get; set; } = "Y/m/d";
+        public string TimeZone { get; set; } = "UTC";
+        public bool TaxPerItem { get; set; }
+        public bool DiscountPerItem { get; set; }
+        public int DueDays { get; set; } = 7;
+        public int ExpiryDays { get; set; } = 7;
+        public string InvoiceFormat { get; set; } = "";
+        public string EstimateFormat { get; set; } = "";
+        public string PaymentFormat { get; set; } = "";
+    }
+
+    private static readonly (string, string)[] MailKinds = DocumentMailer.Kinds;
+
+    private SmtpSettings smtp = new();
+    private bool smtpEnabled, hasPassword, testing, expireLinks, mailTracking;
+    private int linkDays = 7;
+    private Dictionary<string, string> mailBodies = [];
+    private Dictionary<string, bool> attachments = [];
+    private Dictionary<string, bool> mailEnabled = [];
+
+    private bool loaded, isOwner, isSuperAdmin, hasTransactions;
+    private string defaultTheme = Themes.Fallback, loginTheme = Themes.Fallback;
+    private int logoVersion;
+    private string tab = "company";
+    private string? message, error;
+    private Company company = new();
+    private Address address = new();
+    private List<Country> countries = [];
+    private List<Currency> currencies = [];
+    private Preferences prefs = new();
+    private List<TaxType> taxTypes = [];
+    private TaxType newTax = new() { CalculationType = "percentage" };
+    private decimal newTaxValue;
+    private bool newTaxCompound;
+    private List<(int Id, string Name)> lookup = [];
+    private string newName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        isOwner = Current.Company.OwnerId == Current.UserId;
+        await using var db = Dbs.Create();
+        isSuperAdmin = await db.Users.AnyAsync(u => u.Id == Current.UserId && u.Role == Installer.SuperAdmin);
+        company = await db.Companies.SingleAsync(c => c.Id == Current.Id);
+        address = await db.Addresses.Where(a => a.CompanyId == Current.Id && a.CustomerId == null && a.UserId == null).OrderBy(a => a.Id).FirstOrDefaultAsync() ?? new Address();
+        countries = await db.Countries.OrderBy(c => c.Name).ToListAsync();
+        currencies = await db.Currencies.OrderBy(c => c.Code).ToListAsync();
+        var id = Current.Id;
+        hasTransactions = await db.Customers.AnyAsync(x => x.CompanyId == id) || await db.Items.AnyAsync(x => x.CompanyId == id)
+            || await db.Invoices.AnyAsync(x => x.CompanyId == id) || await db.Estimates.AnyAsync(x => x.CompanyId == id)
+            || await db.Expenses.AnyAsync(x => x.CompanyId == id) || await db.Payments.AnyAsync(x => x.CompanyId == id);
+        prefs = new Preferences
+        {
+            Currency = Current.Setting("currency"),
+            DateFormat = Current.Setting("carbon_date_format", "Y/m/d"),
+            TimeZone = Current.Setting("time_zone", "UTC"),
+            TaxPerItem = Current.Setting("tax_per_item") == "YES",
+            DiscountPerItem = Current.Setting("discount_per_item") == "YES",
+            DueDays = int.TryParse(Current.Setting("invoice_due_date_days"), out var d) ? d : 7,
+            ExpiryDays = int.TryParse(Current.Setting("estimate_expiry_date_days"), out var e) ? e : 7,
+            InvoiceFormat = Current.Setting("invoice_number_format"),
+            EstimateFormat = Current.Setting("estimate_number_format"),
+            PaymentFormat = Current.Setting("payment_number_format"),
+        };
+        await LoadTab();
+        loaded = true;
+    }
+
+    private async Task Select(string key)
+    {
+        tab = key;
+        message = error = null;
+        await LoadTab();
+    }
+
+    private async Task LoadTab()
+    {
+        await using var db = Dbs.Create();
+        var id = Current.Id;
+        switch (tab)
+        {
+            case "emails":
+                var all = await db.CompanySettings.Where(x => x.CompanyId == id).ToDictionaryAsync(x => x.Option, x => x.Value);
+                smtpEnabled = all.GetValueOrDefault("use_custom_mail_config") == "YES";
+                hasPassword = !string.IsNullOrEmpty(all.GetValueOrDefault("company_mail_password"));
+                smtp = new SmtpSettings
+                {
+                    Host = all.GetValueOrDefault("company_mail_host", ""),
+                    Port = int.TryParse(all.GetValueOrDefault("company_mail_port"), out var port) ? port : 587,
+                    Username = all.GetValueOrDefault("company_mail_username"),
+                    Encryption = all.GetValueOrDefault("company_mail_encryption", "tls"),
+                    FromName = all.GetValueOrDefault("company_from_name", Current.Company.Name),
+                    FromMail = all.GetValueOrDefault("company_from_mail", ""),
+                };
+                foreach (var (kind, _) in MailKinds)
+                {
+                    mailBodies[kind] = all.GetValueOrDefault($"{kind}_mail_body") ?? Companies.DefaultMailBody(kind);
+                    attachments[kind] = all.GetValueOrDefault($"{kind}_email_attachment", "NO") != "NO";
+                    mailEnabled[kind] = all.GetValueOrDefault($"{kind}_email_enabled", "YES") != "NO";
+                }
+                expireLinks = all.GetValueOrDefault("automatically_expire_public_links", "YES") == "YES";
+                linkDays = int.TryParse(all.GetValueOrDefault("link_expiry_days"), out var days) ? days : 7;
+                mailTracking = all.GetValueOrDefault("mail_tracking") == "YES";
+                break;
+            case "appearance":
+                defaultTheme = Themes.Valid(await Themes.GlobalAsync(db, Themes.DefaultOption));
+                loginTheme = Themes.Valid(await Themes.GlobalAsync(db, Themes.LoginOption));
+                break;
+            case "updates" when isSuperAdmin && !updatesChecked:
+                await CheckUpdates();
+                break;
+            case "taxes":
+                taxTypes = await db.TaxTypes.Where(t => t.CompanyId == id).OrderBy(t => t.Name).ToListAsync();
+                break;
+            case "methods":
+                lookup = (await db.PaymentMethods.Where(x => x.CompanyId == id).OrderBy(x => x.Name).ToListAsync()).Select(x => (x.Id, x.Name)).ToList();
+                break;
+            case "units":
+                lookup = (await db.Units.Where(x => x.CompanyId == id).OrderBy(x => x.Name).ToListAsync()).Select(x => (x.Id, x.Name)).ToList();
+                break;
+            case "categories":
+                lookup = (await db.ExpenseCategories.Where(x => x.CompanyId == id).OrderBy(x => x.Name).ToListAsync()).Select(x => (x.Id, x.Name)).ToList();
+                break;
+        }
+    }
+
+    private async Task SaveCompany()
+    {
+        message = error = null;
+        if (string.IsNullOrWhiteSpace(company.Name))
+        {
+            error = Loc.T("Le nom est obligatoire.");
+            return;
+        }
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        company.UpdatedAt = now;
+        db.Companies.Update(company);
+        address.CompanyId = Current.Id;
+        address.Name = company.Name;
+        address.UpdatedAt = now;
+        if (address.Id == 0)
+        {
+            address.CreatedAt = now;
+            db.Addresses.Add(address);
+        }
+        else
+        {
+            db.Addresses.Update(address);
+        }
+        await db.SaveChangesAsync();
+        await Current.RefreshAsync();
+        message = Loc.T("Société enregistrée.");
+    }
+
+    private class ImportSource
+    {
+        public DbProvider Provider { get; set; } = DbProvider.MySql;
+        public string Host { get; set; } = "localhost";
+        public int Port { get; set; } = 3306;
+        public string Database { get; set; } = "invoiceshelf";
+        public string User { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    private ImportSource importSource = new();
+    private bool importConfirmed, importing;
+    private List<string>? importReport;
+    private Dictionary<string, long>? importCounts;   // set once the source was read
+    private HashSet<string> importSelected = [];
+    private string importConnection = "";
+
+    private void ImportProviderChanged()
+    {
+        importSource.Port = importSource.Provider == DbProvider.Postgres ? 5432 : 3306;
+        importSource.Host = importSource.Provider == DbProvider.Sqlite ? "" : "localhost";
+    }
+
+    private async Task AnalyzeImport()
+    {
+        message = error = null;
+        if (!isSuperAdmin)
+            return;
+        importing = true;
+        try
+        {
+            var s = importSource;
+            var connection = DatabaseProviderExtensions.SourceConnectionString(s.Provider, s.Host.Trim(), s.Port, s.Database.Trim(), s.User, s.Password);
+            importCounts = await InvoiceShelfImport.AnalyzeAsync(s.Provider, connection);
+            importConnection = connection;
+            importSelected = InvoiceShelfImport.Categories.Select(c => c.Key).ToHashSet();
+            importConfirmed = false;
+        }
+        catch (Exception e)
+        {
+            error = "Lecture impossible : " + e.Message;
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
+
+    private void ToggleImportCategory(string key)
+    {
+        if (!importSelected.Remove(key))
+            importSelected.Add(key);
+    }
+
+    private void ResetImport()
+    {
+        importCounts = null;
+        importConnection = "";
+        importConfirmed = false;
+    }
+
+    private async Task RunImport()
+    {
+        message = error = null;
+        if (!isSuperAdmin || !importConfirmed || importCounts is null)
+            return;
+        importing = true;
+        try
+        {
+            await using var db = Dbs.Create();
+            importReport = await InvoiceShelfImport.RunAsync(db, importSource.Provider, importConnection, importSelected);
+            importSource = new();
+            importConnection = "";
+            importCounts = null;
+        }
+        catch (Exception e)
+        {
+            error = Loc.T("Import impossible : ") + e.Message;
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
+
+    private AppUpdates.Release? latest;
+    private bool checkingUpdates, updatesChecked, installing;
+
+    private async Task CheckUpdates()
+    {
+        message = error = null;
+        checkingUpdates = true;
+        try
+        {
+            latest = await Updates.LatestAsync();
+            updatesChecked = true;
+        }
+        catch (Exception e)
+        {
+            error = "Recherche impossible : " + e.Message;
+        }
+        finally
+        {
+            checkingUpdates = false;
+        }
+    }
+
+    private async Task InstallUpdate()
+    {
+        message = error = null;
+        if (!isSuperAdmin || latest is null)
+            return;
+        installing = true;
+        try
+        {
+            await Updates.InstallAsync(latest);
+            message = Loc.F("Factos {0} est installé. L'application redémarre : rechargez la page dans quelques secondes.", latest.TagName);
+        }
+        catch (Exception e)
+        {
+            error = "Installation impossible : " + e.Message;
+            installing = false;
+        }
+    }
+
+    private async Task SaveAppearance()
+    {
+        message = error = null;
+        if (!isSuperAdmin)
+            return;
+        await using var db = Dbs.Create();
+        await Themes.SetGlobalAsync(db, Themes.DefaultOption, defaultTheme);
+        await Themes.SetGlobalAsync(db, Themes.LoginOption, loginTheme);
+        message = Loc.T("Thèmes enregistrés. Ils s'appliquent au prochain chargement des pages.");
+    }
+
+    private async Task SavePreferences()
+    {
+        message = error = null;
+        var values = new Dictionary<string, string>
+        {
+            ["carbon_date_format"] = prefs.DateFormat,
+            ["time_zone"] = prefs.TimeZone,
+            ["moment_date_format"] = DateFormats.First(f => f.Carbon == prefs.DateFormat).Moment,
+            ["tax_per_item"] = prefs.TaxPerItem ? "YES" : "NO",
+            ["discount_per_item"] = prefs.DiscountPerItem ? "YES" : "NO",
+            ["invoice_due_date_days"] = prefs.DueDays.ToString(),
+            ["estimate_expiry_date_days"] = prefs.ExpiryDays.ToString(),
+            ["invoice_number_format"] = prefs.InvoiceFormat,
+            ["estimate_number_format"] = prefs.EstimateFormat,
+            ["payment_number_format"] = prefs.PaymentFormat,
+        };
+        if (!hasTransactions)
+            values["currency"] = prefs.Currency;
+
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        foreach (var (option, value) in values)
+        {
+            var row = await db.CompanySettings.FirstOrDefaultAsync(s => s.CompanyId == Current.Id && s.Option == option);
+            if (row is null)
+                db.CompanySettings.Add(row = new CompanySetting { CompanyId = Current.Id, Option = option, CreatedAt = now });
+            row.Value = value;
+            row.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync();
+        await Current.RefreshAsync();
+        message = Loc.T("Préférences enregistrées.");
+    }
+
+    private async Task UploadLogo(InputFileChangeEventArgs e)
+    {
+        message = error = null;
+        try
+        {
+            if (e.File.Size > Logos.MaxBytes)
+                throw new SalesException(Loc.T("Le logo ne doit pas dépasser 2 Mo."));
+            using var buffer = new MemoryStream();
+            await e.File.OpenReadStream(Logos.MaxBytes).CopyToAsync(buffer);
+            await Logos.SaveAsync(Current.Id, buffer.ToArray());
+            await ReloadCompany();
+            message = Loc.T("Logo enregistré.");
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task RemoveLogo()
+    {
+        message = error = null;
+        await Logos.RemoveAsync(Current.Id);
+        await ReloadCompany();
+        message = Loc.T("Logo retiré.");
+    }
+
+    private async Task ReloadCompany()
+    {
+        await using var db = Dbs.Create();
+        company = await db.Companies.SingleAsync(c => c.Id == Current.Id);
+        logoVersion++;   // bust the browser cache of /logos/{hash}
+        await Current.RefreshAsync();
+    }
+
+    private async Task SaveSmtp()
+    {
+        message = error = null;
+        if (smtpEnabled && (string.IsNullOrWhiteSpace(smtp.Host) || string.IsNullOrWhiteSpace(smtp.FromMail)))
+        {
+            error = Loc.T("Le serveur et l'adresse de l'expéditeur sont obligatoires.");
+            return;
+        }
+        await Mailer.SaveAsync(Current.Id, smtp, smtpEnabled);
+        if (!string.IsNullOrEmpty(smtp.Password))
+            hasPassword = true;
+        smtp.Password = null;   // never rendered back into the page
+        message = Loc.T("Serveur d'envoi enregistré.");
+    }
+
+    private async Task TestSmtp()
+    {
+        message = error = null;
+        testing = true;
+        try
+        {
+            var settings = await Mailer.SettingsAsync(Current.Id);
+            if (settings is null)
+            {
+                error = Loc.T("Aucun serveur d'envoi configuré : enregistrez d'abord la configuration.");
+                return;
+            }
+            await using var db = Dbs.Create();
+            var to = await db.Users.Where(u => u.Id == Current.UserId).Select(u => u.Email).SingleAsync();
+            var test = new MimeKit.MimeMessage { Subject = "Factos — e-mail de test" };
+            test.To.Add(MimeKit.MailboxAddress.Parse(to!));
+            test.Body = new MimeKit.TextPart("plain") { Text = Loc.T("La configuration d'envoi de Factos fonctionne.") };
+            await Mailer.SendAsync(settings, test);
+            message = Loc.F("E-mail de test envoyé à {0}.", to);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            error = Loc.F("L'envoi a échoué : {0}", ex.Message);
+        }
+        finally
+        {
+            testing = false;
+        }
+    }
+
+    private async Task SaveMailContent()
+    {
+        message = error = null;
+        var values = new Dictionary<string, string>
+        {
+            ["automatically_expire_public_links"] = expireLinks ? "YES" : "NO",
+            ["link_expiry_days"] = Math.Max(1, linkDays).ToString(),
+            ["mail_tracking"] = mailTracking ? "YES" : "NO",
+        };
+        foreach (var (kind, _) in MailKinds)
+        {
+            values[$"{kind}_mail_body"] = mailBodies[kind];
+            values[$"{kind}_email_attachment"] = attachments[kind] ? "YES" : "NO";
+            values[$"{kind}_email_enabled"] = mailEnabled[kind] ? "YES" : "NO";
+        }
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        foreach (var (option, value) in values)
+        {
+            var row = await db.CompanySettings.FirstOrDefaultAsync(s => s.CompanyId == Current.Id && s.Option == option);
+            if (row is null)
+                db.CompanySettings.Add(row = new CompanySetting { CompanyId = Current.Id, Option = option, CreatedAt = now });
+            row.Value = value;
+            row.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync();
+        await Current.RefreshAsync();
+        message = Loc.T("Contenu des e-mails enregistré.");
+    }
+
+    private async Task AddTax()
+    {
+        message = error = null;
+        if (string.IsNullOrWhiteSpace(newTax.Name))
+        {
+            error = Loc.T("Le nom de la taxe est obligatoire.");
+            return;
+        }
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        newTax.CompanyId = Current.Id;
+        newTax.CompoundTax = (byte)(newTaxCompound ? 1 : 0);
+        if (newTax.CalculationType == "fixed")
+            newTax.FixedAmount = (int)Money.ToCents(newTaxValue);
+        else
+            newTax.Percent = newTaxValue;
+        newTax.CreatedAt = newTax.UpdatedAt = now;
+        db.TaxTypes.Add(newTax);
+        await db.SaveChangesAsync();
+        newTax = new TaxType { CalculationType = "percentage" };
+        newTaxValue = 0;
+        newTaxCompound = false;
+        await LoadTab();
+    }
+
+    private async Task DeleteTax(TaxType tax)
+    {
+        message = error = null;
+        if (!await JS.InvokeAsync<bool>("confirm", Loc.F("Supprimer la taxe « {0} » ?", tax.Name)))
+            return;
+        await using var db = Dbs.Create();
+        if (await db.Taxes.AnyAsync(t => t.TaxTypeId == tax.Id))
+        {
+            error = Loc.T("Cette taxe est utilisée par des documents.");
+            return;
+        }
+        await db.TaxTypes.Where(t => t.Id == tax.Id && t.CompanyId == Current.Id).ExecuteDeleteAsync();
+        await LoadTab();
+    }
+
+    private async Task AddLookup()
+    {
+        message = error = null;
+        if (string.IsNullOrWhiteSpace(newName))
+            return;
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        switch (tab)
+        {
+            case "methods": db.PaymentMethods.Add(new PaymentMethod { Name = newName, CompanyId = Current.Id, CreatedAt = now, UpdatedAt = now }); break;
+            case "units": db.Units.Add(new Unit { Name = newName, CompanyId = Current.Id, CreatedAt = now, UpdatedAt = now }); break;
+            case "categories": db.ExpenseCategories.Add(new ExpenseCategory { Name = newName, CompanyId = Current.Id, CreatedAt = now, UpdatedAt = now }); break;
+        }
+        await db.SaveChangesAsync();
+        newName = "";
+        await LoadTab();
+    }
+
+    private async Task DeleteLookup(int id)
+    {
+        message = error = null;
+        await using var db = Dbs.Create();
+        var inUse = tab switch
+        {
+            "methods" => await db.Payments.AnyAsync(p => p.PaymentMethodId == id) || await db.Expenses.AnyAsync(e => e.PaymentMethodId == id),
+            "units" => await db.Items.AnyAsync(i => i.UnitId == id),
+            "categories" => await db.Expenses.AnyAsync(e => e.ExpenseCategoryId == id),
+            _ => false,
+        };
+        if (inUse)
+        {
+            error = Loc.T("Élément utilisé : impossible de le supprimer.");
+            return;
+        }
+        switch (tab)
+        {
+            case "methods": await db.PaymentMethods.Where(x => x.Id == id && x.CompanyId == Current.Id).ExecuteDeleteAsync(); break;
+            case "units": await db.Units.Where(x => x.Id == id && x.CompanyId == Current.Id).ExecuteDeleteAsync(); break;
+            case "categories": await db.ExpenseCategories.Where(x => x.Id == id && x.CompanyId == Current.Id).ExecuteDeleteAsync(); break;
+        }
+        await LoadTab();
+    }
+}

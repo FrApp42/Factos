@@ -1,0 +1,192 @@
+@* Paramètres › Modèles: the company's PDF templates, previewed as the real PDF's first page. *@
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject Sales Sales
+@inject Logos Logos
+
+@if (templates is null || sample is null) { <p>@Loc.T("Chargement…")</p> return; }
+
+@if (message is not null) { <div class="alert alert-success">@message</div> }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card mb-3"><div class="card-body">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <label class="flex-grow-1 mb-0"><span class="form-label d-block">@Loc.T("Modèle")</span>
+                    <select class="form-select" value="@index" @onchange="e => { index = int.Parse(e.Value!.ToString()!); Refresh(); }">
+                        @for (var i = 0; i < templates.Count; i++)
+                        {
+                            <option value="@i">@templates[i].Name@(i == 0 ? Loc.T(" (par défaut)") : "")</option>
+                        }
+                    </select></label>
+                <button class="btn btn-outline-primary" @onclick="Duplicate">@Loc.T("Dupliquer")</button>
+                @if (index > 0)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="MakeDefault">@Loc.T("Par défaut")</button>
+                }
+                @if (templates.Count > 1)
+                {
+                    <button class="btn btn-outline-danger" @onclick="Remove">@Loc.T("Supprimer")</button>
+                }
+            </div>
+        </div></div>
+
+        <div class="card mb-3"><div class="card-body row g-3">
+            <div class="col-12">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom")</span>
+                    <input class="form-control" @bind="T.Name" @bind:after="Refresh" /></label>
+            </div>
+            <div class="col-6">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Couleur principale")</span>
+                    <input type="color" class="form-control form-control-color w-100" @bind="T.Accent" @bind:after="Refresh" /></label>
+            </div>
+            <div class="col-6">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Taille du texte")</span>
+                    <input type="number" min="7" max="14" step="0.5" class="form-control" @bind="T.FontSize" @bind:after="Refresh" /></label>
+            </div>
+            <div class="col-12">
+                <span class="form-label d-block">@Loc.T("Logo")</span>
+                <label class="form-check form-check-inline"><input type="radio" class="form-check-input" name="logo-side" checked="@(!T.LogoRight)" @onchange="() => Set(() => T.LogoRight = false)" /> @Loc.T("à gauche")</label>
+                <label class="form-check form-check-inline"><input type="radio" class="form-check-input" name="logo-side" checked="@T.LogoRight" @onchange="() => Set(() => T.LogoRight = true)" /> @Loc.T("à droite")</label>
+                <label class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" @bind="T.HideCompanyNameWithLogo" @bind:after="Refresh" /> @Loc.T("Masquer le nom de la société quand un logo est défini")</label>
+            </div>
+            <div class="col-12">
+                <label class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" @bind="T.FilledTableHeader" @bind:after="Refresh" /> @Loc.T("En-tête du tableau rempli de la couleur")</label>
+                <label class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" @bind="T.ShowDescription" @bind:after="Refresh" /> @Loc.T("Descriptions des articles")</label>
+                <label class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" @bind="T.ShowUnit" @bind:after="Refresh" /> @Loc.T("Unités après les quantités")</label>
+                <label class="form-check form-switch"><input type="checkbox" class="form-check-input" role="switch" @bind="T.PageNumbers" @bind:after="Refresh" /> @Loc.T("Numéros de page")</label>
+            </div>
+        </div></div>
+
+        <div class="card mb-3"><div class="card-body">
+            <h2 class="h6">@Loc.T("Blocs et ordre")</h2>
+            <ul class="list-group">
+                @foreach (var (key, label) in OrderedBlocks)
+                {
+                    var on = T.Blocks.Contains(key);
+                    var pos = T.Blocks.IndexOf(key);
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <label class="form-check form-switch mb-0 flex-grow-1"><input type="checkbox" class="form-check-input" role="switch" checked="@on" @onchange="() => Toggle(key)" /> @Loc.T(label)</label>
+                        @if (on)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary" disabled="@(pos == 0)" aria-label="Monter @label" @onclick="() => Move(key, -1)">↑</button>
+                            <button class="btn btn-sm btn-outline-secondary" disabled="@(pos == T.Blocks.Count - 1)" aria-label="Descendre @label" @onclick="() => Move(key, 1)">↓</button>
+                        }
+                    </li>
+                }
+            </ul>
+        </div></div>
+
+        <div class="card mb-3"><div class="card-body row g-3">
+            <div class="col-12">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Texte d'introduction (bloc « Texte d'introduction »)")</span>
+                    <textarea class="form-control" rows="3" @bind="T.IntroText" @bind:after="Refresh"></textarea></label>
+            </div>
+            <div class="col-12">
+                <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Pied de page (mentions légales…)")</span>
+                    <textarea class="form-control" rows="3" @bind="T.FooterText" @bind:after="Refresh"></textarea></label>
+            </div>
+            <div class="col-12 small text-muted">Variables : @string.Join(" ", sample.Placeholders().Keys.Where(k => !k.StartsWith("{SHIPPING")))</div>
+        </div></div>
+
+        <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer les modèles")</button>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card position-sticky" style="top:1rem"><div class="card-body">
+            <div class="small text-muted mb-2">@Loc.F("Aperçu — {0}, première page", (sample.Id == 0 ? "facture d'exemple" : $"facture {sample.Number}"))</div>
+            @if (preview is not null)
+            {
+                <img class="img-fluid border" src="data:image/png;base64,@preview" alt="Aperçu du modèle @T.Name" />
+            }
+        </div></div>
+    </div>
+</div>
+
+@code {
+    private List<DocumentTemplate>? templates;
+    private int index;
+    private DocumentData? sample;
+    private byte[]? logo;
+    private string? preview, message, error;
+
+    private DocumentTemplate T => templates![index];
+
+    /// Enabled blocks in their order, then the disabled ones.
+    private IEnumerable<(string Key, string Label)> OrderedBlocks => DocumentTemplate.AllBlocks
+        .OrderBy(b => T.Blocks.IndexOf(b.Key) is var i && i < 0 ? int.MaxValue : i);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        templates = await DocumentTemplates.LoadAsync(Dbs, Current.Id);
+        sample = await DocumentTemplates.SampleAsync(Dbs, Sales, Current.Id);
+        logo = Logos.Read(sample.Company.Logo);
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        error = message = null;
+        if (DocumentTemplates.Validate([T]) is { } invalid)
+        {
+            error = invalid;
+            return;
+        }
+        preview = Convert.ToBase64String(DocumentPdf.Preview(sample!, logo, T));
+    }
+
+    private void Set(Action change)
+    {
+        change();
+        Refresh();
+    }
+
+    private void Toggle(string key) => Set(() => { if (!T.Blocks.Remove(key)) T.Blocks.Add(key); });
+
+    private void Move(string key, int by) => Set(() =>
+    {
+        var i = T.Blocks.IndexOf(key);
+        (T.Blocks[i], T.Blocks[i + by]) = (T.Blocks[i + by], T.Blocks[i]);
+    });
+
+    private void Duplicate()
+    {
+        var copy = System.Text.Json.JsonSerializer.Deserialize<DocumentTemplate>(System.Text.Json.JsonSerializer.Serialize(T))!;
+        copy.Name = $"{T.Name} (copie)";
+        templates!.Add(copy);
+        index = templates.Count - 1;
+        Refresh();
+    }
+
+    private void MakeDefault()
+    {
+        var t = T;
+        templates!.RemoveAt(index);
+        templates.Insert(0, t);
+        index = 0;
+        Refresh();
+    }
+
+    private void Remove()
+    {
+        templates!.RemoveAt(index);
+        index = 0;
+        Refresh();
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            await DocumentTemplates.SaveAsync(Dbs, Current.Id, templates!);
+            message = Loc.T("Modèles enregistrés. Les documents dont le modèle n'existe plus utilisent celui par défaut.");
+            error = null;
+        }
+        catch (SalesException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

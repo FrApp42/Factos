@@ -1,0 +1,49 @@
+@page "/admin/suppliers"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+
+<PageTitle>@Loc.T("Fournisseurs · Factos")</PageTitle>
+
+<div class="page-head">
+    <h1>@Loc.T("Fournisseurs")</h1>
+    <a class="btn btn-primary" href="admin/suppliers/create">@Loc.T("+ Nouveau fournisseur")</a>
+</div>
+
+@if (rows is null) { <p>@Loc.T("Chargement…")</p> }
+else if (rows.Count == 0) { <p class="text-muted">@Loc.T("Aucun fournisseur.")</p> }
+else
+{
+    <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Nom")</th><th>@Loc.T("Contact")</th><th>E-mail</th><th>@Loc.T("Devise")</th><th class="money">@Loc.T("À payer")</th></tr></thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr class="@(r.Supplier.Enabled ? "" : "text-muted")">
+                        <td><a href="admin/suppliers/@r.Supplier.Id">@r.Supplier.Name</a>@(r.Supplier.Enabled ? "" : Loc.T(" (désactivé)"))</td>
+                        <td>@r.Supplier.ContactName</td>
+                        <td>@r.Supplier.Email</td>
+                        <td>@r.Currency?.Code</td>
+                        <td class="money">@Current.Money(r.Due, r.Currency)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div></div>
+}
+
+@code {
+    private record Row(Supplier Supplier, Currency? Currency, long Due);
+    private List<Row>? rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        var suppliers = await db.Suppliers.Where(s => s.CompanyId == Current.Id).OrderBy(s => s.Name).ToListAsync();
+        var currencies = await db.Currencies.ToDictionaryAsync(c => c.Id);
+        var due = await db.Bills.Where(b => b.CompanyId == Current.Id && b.Status == Purchases.Open)
+            .GroupBy(b => b.SupplierId).Select(g => new { g.Key, Sum = g.Sum(b => b.DueAmount) }).ToDictionaryAsync(x => x.Key, x => x.Sum);
+        rows = suppliers.Select(s => new Row(s, currencies.GetValueOrDefault(s.CurrencyId), due.GetValueOrDefault(s.Id))).ToList();
+    }
+}

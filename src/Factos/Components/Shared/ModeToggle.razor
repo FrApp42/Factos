@@ -1,0 +1,5 @@
+@* Light/dark switch; the mode lives in the browser (App.razor's script), not on the server. *@
+<button type="button" class="btn btn-sm btn-outline-secondary mode-toggle" onclick="factosToggleMode()"
+        title="@Loc.T("Basculer thème clair / sombre")" aria-label="@Loc.T("Basculer thème clair / sombre")">
+    <span class="when-light" aria-hidden="true">☾</span><span class="when-dark" aria-hidden="true">☀</span>
+</button>

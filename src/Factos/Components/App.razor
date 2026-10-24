@@ -1,0 +1,66 @@
+@using System.Security.Claims
+@using Factos.Data
+@using Factos.Domain
+<!DOCTYPE html>
+<html lang="@Loc.Lang" data-theme="@theme">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Factos.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <HeadOutlet @rendermode="PageRenderMode" />
+    @* Light/dark: the toggle's choice (this browser only), else the system. Set before paint. *@
+    <script>
+        (function () {
+            var system = matchMedia('(prefers-color-scheme: dark)');
+            function stored() { try { return localStorage.getItem('factos-mode'); } catch (e) { return null; } }
+            window.factosApplyMode = function () {
+                document.documentElement.dataset.mode = stored() || (system.matches ? 'dark' : 'light');
+            };
+            window.factosToggleMode = function () {
+                var mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark';
+                try { localStorage.setItem('factos-mode', mode); } catch (e) { }
+                document.documentElement.dataset.mode = mode;
+            };
+            system.addEventListener('change', factosApplyMode);
+            factosApplyMode();
+        })();
+    </script>
+</head>
+
+<body>
+    <Routes @rendermode="PageRenderMode" />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>Blazor.addEventListener('enhancedload', factosApplyMode);</script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [Inject] private AppDbFactory Dbs { get; set; } = default!;
+
+    private string theme = Themes.Fallback;
+
+    // Rendered once per full page load: a theme change shows on the next one.
+    protected override async Task OnInitializedAsync()
+    {
+        int? userId = int.TryParse(HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+        await using var db = Dbs.Create();
+        theme = await Themes.ForUserAsync(db, userId);
+    }
+
+    // Identity's account pages need a real HTTP request (cookies), so they stay static;
+    // everything else runs on the interactive circuit.
+    private IComponentRenderMode? PageRenderMode =>
+        HttpContext.AcceptsInteractiveRouting() ? RenderModes.Server : null;
+}

@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/*.user
+.vs/
+.claude/
+graphify-out/
+tests/
+src/Factos/App_Data/
+src/Factos/Data/app.db*
+src/Factos/Data/keys/
+src/Factos/Data/uploads/
+src/Factos/appsettings.local.json

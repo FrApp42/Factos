@@ -1,0 +1,69 @@
+@page "/admin/companies/create"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Nouvelle société · Factos")</PageTitle>
+
+<div class="page-head"><h1>@Loc.T("Nouvelle société")</h1></div>
+
+@if (!loaded) { <p>@Loc.T("Chargement…")</p> return; }
+@if (!allowed)
+{
+    @* CompanyPolicy::create(): only the owner of the active company may open another. *@
+    <div class="alert alert-warning">@Loc.T("Seul le propriétaire de la société active peut créer une société.")</div>
+    return;
+}
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3" style="max-width:40rem"><div class="card-body row g-3">
+    <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span><input class="form-control" @bind="name" /></label></div>
+    <div class="col-12">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Devise *")</span>
+            <select class="form-select" @bind="currencyId">
+                @foreach (var c in currencies) { <option value="@c.Id">@c.Code — @c.Name</option> }
+            </select></label>
+    </div>
+</div></div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" disabled="@saving" @onclick="Create">@Loc.T("Créer")</button>
+    <a class="btn btn-outline-secondary" href="admin/settings">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    private bool loaded, allowed, saving;
+    private string name = "";
+    private int currencyId;
+    private List<Currency> currencies = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        allowed = Current.Company.OwnerId == Current.UserId;
+        await using var db = Dbs.Create();
+        currencies = await db.Currencies.OrderBy(c => c.Code).ToListAsync();
+        currencyId = Current.Currency?.Id ?? currencies.First().Id;
+        loaded = true;
+    }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            error = Loc.T("Le nom est obligatoire.");
+            return;
+        }
+        saving = true;
+        int companyId;
+        await using (var db = Dbs.Create())
+        {
+            var owner = await db.Users.SingleAsync(u => u.Id == Current.UserId);
+            companyId = (await Companies.CreateAsync(db, owner, name.Trim(), currencyId)).Id;
+        }
+        // Reload so every component sees the new company list and selection.
+        await Current.RememberSelectionAsync(companyId);
+        Navigation.NavigateTo("admin/settings", forceLoad: true);
+    }
+}

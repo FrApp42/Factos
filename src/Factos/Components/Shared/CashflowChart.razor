@@ -1,0 +1,147 @@
+@* Port de DashboardChart.vue + CashflowChart.vue : facturé, encaissé, dépensé par mois, en aires ou en barres.
+   SVG étiré sur la zone de tracé (preserveAspectRatio="none"), libellés et info-bulles en HTML par-dessus. *@
+@inject CurrentCompany Current
+
+<section class="card mb-4" aria-labelledby="cashflow-title"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center gap-3">
+        <div>
+            <h2 class="h6 mb-0" id="cashflow-title">@Loc.T("Flux de trésorerie")</h2>
+            <div class="small text-muted">@Loc.F("Exercice du {0} au {1}", Current.Date(Data.From), Current.Date(Data.From.AddMonths(12).AddDays(-1)))</div>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="@Loc.T("Style du graphique")">
+            <button type="button" class="btn btn-outline-secondary @(Bars ? "" : "active")" aria-pressed="@(Bars ? "false" : "true")" @onclick='() => TypeChanged.InvokeAsync("area")'>@Loc.T("Aires")</button>
+            <button type="button" class="btn btn-outline-secondary @(Bars ? "active" : "")" aria-pressed="@(Bars ? "true" : "false")" @onclick='() => TypeChanged.InvokeAsync("bars")'>@Loc.T("Barres")</button>
+        </div>
+    </div>
+
+    @* Totaux de la période, qui servent aussi de légende *@
+    <ul class="cashflow-kpis">
+        @foreach (var (label, amount, css) in Kpis)
+        {
+            <li><span class="cf-swatch @css" aria-hidden="true"></span><div><div class="small text-muted">@label</div><div class="fw-semibold text-body">@Current.Money(amount)</div></div></li>
+        }
+    </ul>
+
+    <div class="cashflow-chart">
+        <div class="cf-y" aria-hidden="true">
+            @foreach (var t in ticks) { <span style="bottom:@Pct(Y(t))">@Cashflow.Compact(t)</span> }
+        </div>
+        <div class="cf-plot">
+            <svg viewBox="0 0 @W @H" preserveAspectRatio="none" role="img" aria-label="@Loc.T("Flux de trésorerie")">
+                <defs>
+                    @for (var s = 0; s < 3; s++)
+                    {
+                        <linearGradient id="cf-fill-@s" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" style="stop-color:var(--chart-@(s + 1));stop-opacity:.28" />
+                            <stop offset="1" style="stop-color:var(--chart-@(s + 1));stop-opacity:0" />
+                        </linearGradient>
+                    }
+                </defs>
+                @foreach (var t in ticks)
+                {
+                    <line class="cf-grid" x1="0" x2="@W" y1="@N(H - Y(t) * H)" y2="@N(H - Y(t) * H)" />
+                }
+                @for (var s = 0; s < 3; s++)
+                {
+                    var values = Values[s];
+                    if (Bars)
+                    {
+                        for (var m = 0; m < 12; m++)
+                        {
+                            var (top, bottom) = (H - Y(Math.Max(values[m], 0)) * H, H - Y(Math.Min(values[m], 0)) * H);
+                            <rect x="@N(m * Col + Col * .17 + s * Col * .22 + Col * .015)" width="@N(Col * .19)" y="@N(top)" height="@N(bottom - top)" style="fill:var(--chart-@(s + 1))" />
+                        }
+                    }
+                    else
+                    {
+                        var line = Curve(values);
+                        <path d="@($"{line} L{N(X(11))},{N(Zero)} L{N(X(0))},{N(Zero)} Z")" fill="url(#cf-fill-@s)" />
+                        <path d="@line" fill="none" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" style="stroke:var(--chart-@(s + 1))" />
+                    }
+                }
+            </svg>
+            <div class="cf-cols">
+                @for (var m = 0; m < 12; m++)
+                {
+                    <div class="cf-col" tabindex="0">
+                        <div class="cf-tip @(m >= 8 ? "end" : "")" role="tooltip">
+                            <div class="fw-semibold text-body">@Data.Labels[m] @Data.From.AddMonths(m).Year</div>
+                            @for (var s = 0; s < 3; s++)
+                            {
+                                <div><span class="cf-swatch chart-@(s + 1)" aria-hidden="true"></span>@Current.Money(Values[s][m]) <span class="text-muted">@SeriesLabels[s]</span></div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            @if (Data.IsEmpty)
+            {
+                <div class="cf-empty" role="status"><strong>@Loc.T("Aucune activité sur la période")</strong><span class="text-muted small">@Loc.T("Les factures, paiements et dépenses enregistrés apparaîtront ici.")</span></div>
+            }
+        </div>
+        <div></div>
+        <div class="cf-x" aria-hidden="true">@foreach (var l in Data.Labels) { <span>@l</span> }</div>
+    </div>
+
+    <details class="mt-3">
+        <summary class="small">@Loc.T("Afficher en tableau")</summary>
+        <div class="table-responsive">
+            <table class="table table-sm mt-2 mb-0">
+                <caption class="visually-hidden">@Loc.T("Flux de trésorerie")</caption>
+                <thead><tr><th scope="col">@Loc.T("Mois")</th>@foreach (var l in SeriesLabels) { <th scope="col" class="text-end">@l</th> }</tr></thead>
+                <tbody>
+                    @for (var m = 0; m < 12; m++)
+                    {
+                        <tr><th scope="row" class="fw-normal">@Data.Labels[m] @Data.From.AddMonths(m).Year</th>@for (var s = 0; s < 3; s++) { <td class="money">@Current.Money(Values[s][m])</td> }</tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </details>
+</div></section>
+
+@code {
+    [Parameter, EditorRequired] public Cashflow.Series Data { get; set; } = null!;
+    [Parameter] public string Type { get; set; } = "area";
+    [Parameter] public EventCallback<string> TypeChanged { get; set; }
+
+    private static string[] SeriesLabels => [Loc.T("Ventes"), Loc.T("Encaissements"), Loc.T("Dépenses")];
+    private const double W = 1200, H = 600, Col = W / 12;
+
+    private long[] ticks = [];
+    private bool Bars => Type == "bars";
+    private long[][] Values => [Data.Sales, Data.Receipts, Data.Expenses];
+    private (string, long, string)[] Kpis =>
+    [
+        (SeriesLabels[0], Data.TotalSales, "chart-1"),
+        (SeriesLabels[1], Data.TotalReceipts, "chart-2"),
+        (SeriesLabels[2], Data.TotalExpenses, "chart-3"),
+        ("Résultat net", Data.NetIncome, "chart-net"),
+    ];
+
+    protected override void OnParametersSet()
+    {
+        var all = Values.SelectMany(v => v).ToList();
+        ticks = Cashflow.Ticks(all.Min(), all.Max());
+    }
+
+    // Hauteur relative (0 = bas de l'axe, 1 = haut) d'un montant
+    private double Y(long cents) => (double)(cents - ticks[0]) / (ticks[^1] - ticks[0]);
+    private double X(int month) => (month + .5) * Col;
+    private double Zero => H - Y(0) * H;
+    private static string N(double v) => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    private static string Pct(double v) => N(v * 100) + "%";
+
+    // Courbe lissée (Catmull-Rom → Bézier), l'équivalent de `tension` de Chart.js
+    private string Curve(long[] values)
+    {
+        var p = values.Select((v, m) => (X: X(m), Y: H - Y(v) * H)).ToArray();
+        var d = new System.Text.StringBuilder($"M{N(p[0].X)},{N(p[0].Y)}");
+        for (var i = 0; i < p.Length - 1; i++)
+        {
+            var (a, b, c, e) = (p[Math.Max(i - 1, 0)], p[i], p[i + 1], p[Math.Min(i + 2, p.Length - 1)]);
+            d.Append($" C{N(b.X + (c.X - a.X) / 6)},{N(b.Y + (c.Y - a.Y) / 6)} {N(c.X - (e.X - b.X) / 6)},{N(c.Y - (e.Y - b.Y) / 6)} {N(c.X)},{N(c.Y)}");
+        }
+        return d.ToString();
+    }
+}

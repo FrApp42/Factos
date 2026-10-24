@@ -1,0 +1,26 @@
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+
+@if (Current.Loaded && Current.Companies.Count > 1)
+{
+    <select class="form-select form-select-sm w-auto" value="@Current.Id" @onchange="Switch" aria-label="@Loc.T("Société")">
+        @foreach (var c in Current.Companies)
+        {
+            <option value="@c.Id">@c.Name</option>
+        }
+    </select>
+}
+else if (Current.Loaded)
+{
+    <span class="fw-semibold">@Current.Company.Name</span>
+}
+
+@code {
+    protected override Task OnInitializedAsync() => Current.EnsureLoadedAsync();
+
+    private async Task Switch(ChangeEventArgs e)
+    {
+        await Current.SwitchAsync(int.Parse(e.Value!.ToString()!));
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+}

@@ -1,0 +1,151 @@
+@page "/admin/customers/create"
+@page "/admin/customers/{Id:long}/edit"
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject NavigationManager Navigation
+
+<PageTitle>@Loc.T("Client · Factos")</PageTitle>
+
+<div class="page-head"><h1>@(Id is null ? Loc.T("Nouveau client") : Loc.T("Modifier le client"))</h1></div>
+
+@if (customer is null) { <p>@Loc.T("Chargement…")</p> return; }
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span><InputText class="form-control" @bind-Value="customer.Name" /></label></div>
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Contact")</span><InputText class="form-control" @bind-Value="customer.ContactName" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">E-mail</span><InputText class="form-control" type="email" @bind-Value="customer.Email" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Téléphone")</span><InputText class="form-control" @bind-Value="customer.Phone" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Site web")</span><InputText class="form-control" @bind-Value="customer.Website" /></label></div>
+    <div class="col-md-4">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Devise *")</span>
+        <InputSelect class="form-select" @bind-Value="customer.CurrencyId">
+            @foreach (var c in currencies) { <option value="@c.Id">@c.Code — @c.Name</option> }
+        </InputSelect></label>
+    </div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("N° de TVA / fiscal")</span><InputText class="form-control" @bind-Value="customer.TaxId" /></label></div>
+    <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Préfixe (numérotation)")</span><InputText class="form-control" @bind-Value="customer.Prefix" /></label></div>
+</div></div>
+
+<h2 class="h5">@Loc.T("Adresse de facturation")</h2>
+<div class="card mb-3"><div class="card-body row g-3">
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Adresse")</span><InputText class="form-control" @bind-Value="address.AddressStreet1" /></label></div>
+    <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Complément")</span><InputText class="form-control" @bind-Value="address.AddressStreet2" /></label></div>
+    <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Code postal")</span><InputText class="form-control" @bind-Value="address.Zip" /></label></div>
+    <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Ville")</span><InputText class="form-control" @bind-Value="address.City" /></label></div>
+    <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Région")</span><InputText class="form-control" @bind-Value="address.State" /></label></div>
+    <div class="col-md-3">
+        <label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Pays")</span>
+        <InputSelect class="form-select" @bind-Value="address.CountryId">
+            <option value="">—</option>
+            @foreach (var c in countries) { <option value="@c.Id">@c.Name</option> }
+        </InputSelect></label>
+    </div>
+</div></div>
+
+<h2 class="h5">@Loc.T("E-mails envoyés au client")</h2>
+<div class="card mb-3"><div class="card-body d-flex flex-wrap gap-4">
+    @foreach (var (kind, label) in DocumentMailer.Kinds)
+    {
+        <div class="form-check form-switch">
+            <input class="form-check-input" role="switch" type="checkbox" id="mail-@kind" checked="@(!mailOff.Contains(kind))"
+                   @onchange="e => { if ((bool)e.Value!) mailOff.Remove(kind); else mailOff.Add(kind); }" />
+            <label class="form-check-label" for="mail-@kind">@(char.ToUpper(label[0]) + label[1..])</label>
+        </div>
+    }
+</div></div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
+    <a class="btn btn-outline-secondary" href="admin/customers">@Loc.T("Annuler")</a>
+</div>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private Customer? customer;
+    private Address address = new();
+    private List<Currency> currencies = [];
+    private List<Country> countries = [];
+    private string? error;
+    private HashSet<string> mailOff = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await using var db = Dbs.Create();
+        currencies = await db.Currencies.OrderBy(c => c.Code).ToListAsync();
+        countries = await db.Countries.OrderBy(c => c.Name).ToListAsync();
+        if (Id is { } id)
+        {
+            customer = await db.Customers.SingleAsync(c => c.Id == id && c.CompanyId == Current.Id);
+            address = await db.Addresses.FirstOrDefaultAsync(a => a.CustomerId == id && a.Type == "billing") ?? new Address();
+            mailOff = DocumentMailer.CustomerOff(await Companies.SettingsAsync(db, Current.Id), id);
+        }
+        else
+        {
+            customer = new Customer { CurrencyId = Current.Currency?.Id };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(customer!.Name))
+        {
+            error = Loc.T("Le nom est obligatoire.");
+            return;
+        }
+        if (customer.CurrencyId is null)
+        {
+            error = Loc.T("La devise est obligatoire.");
+            return;
+        }
+
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        customer.UpdatedAt = now;
+        if (customer.Id == 0)
+        {
+            customer.CompanyId = Current.Id;
+            customer.CreatorId = Current.UserId;
+            customer.CreatedAt = now;
+            db.Customers.Add(customer);
+        }
+        else
+        {
+            db.Customers.Update(customer);
+        }
+        await db.SaveChangesAsync();
+
+        address.CustomerId = customer.Id;
+        address.CompanyId = Current.Id;
+        address.Type = "billing";
+        address.Name ??= customer.Name;
+        address.UpdatedAt = now;
+        if (address.Id == 0)
+        {
+            address.CreatedAt = now;
+            db.Addresses.Add(address);
+        }
+        else
+        {
+            db.Addresses.Update(address);
+        }
+
+        var option = DocumentMailer.CustomerOption(customer.Id);
+        var setting = await db.CompanySettings.FirstOrDefaultAsync(s => s.CompanyId == Current.Id && s.Option == option);
+        if (mailOff.Count == 0)
+        {
+            if (setting is not null) db.CompanySettings.Remove(setting);
+        }
+        else
+        {
+            if (setting is null)
+                db.CompanySettings.Add(setting = new CompanySetting { CompanyId = Current.Id, Option = option, CreatedAt = now });
+            setting.Value = string.Join(",", mailOff);
+            setting.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("admin/customers");
+    }
+}

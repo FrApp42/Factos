@@ -1,0 +1,11 @@
+@inherits LayoutComponentBase
+
+<div class="auth-page">
+    <div class="position-absolute top-0 end-0 p-3 d-flex gap-2"><Factos.Components.Shared.LanguageToggle /><Factos.Components.Shared.ModeToggle /></div>
+    <div class="auth-card card shadow-sm">
+        <div class="card-body p-4">
+            <div class="text-center mb-4"><span class="brand text-body"><Factos.Components.Shared.BrandMark />@Loc.T("Factos")</span></div>
+            @Body
+        </div>
+    </div>
+</div>
