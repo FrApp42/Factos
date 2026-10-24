@@ -1,10 +1,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG VERSION=0.0.0
 WORKDIR /src
-COPY src/Factos/Factos.csproj src/Factos/
-RUN dotnet restore src/Factos/Factos.csproj
+# No csproj-only restore layer: restored without the .razor files, the SDK leaves out the
+# framework assets and _framework/blazor.web.js is missing from the publish (404).
 COPY src/Factos/ src/Factos/
-RUN dotnet publish src/Factos/Factos.csproj -c Release -o /app --no-restore -p:Version=$VERSION
+RUN dotnet publish src/Factos/Factos.csproj -c Release -o /app -p:Version=$VERSION
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
