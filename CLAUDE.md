@@ -109,7 +109,7 @@ dotnet ef database update --project src/Factos --context SqliteDbContext
 docker compose up -d   # http://localhost:8080
 ```
 
-Docker : tout l'état persistant est dans le volume `/app/App_Data` (base SQLite par défaut `App_Data/app.db`, clés, logos, et `appsettings.local.json` via un lien symbolique depuis `/app`) ; `restart: unless-stopped` relance l'app après l'assistant. CI : `.github/workflows/build.yml` (tests, puis image poussée sur `ghcr.io/<dépôt>` hors PR).
+Docker : tout l'état persistant est dans le volume `/app/App_Data` (base SQLite par défaut `App_Data/app.db`, clés, logos, et `appsettings.local.json` via `Setup__LocalConfigFile`) ; `restart: unless-stopped` relance l'app après l'assistant. CI : `.github/workflows/build.yml` (tests, puis image poussée sur `ghcr.io/<dépôt>` hors PR).
 
 ## Divergences d'API connues
 

@@ -25,17 +25,22 @@ var builder = WebApplication.CreateBuilder(importArgs is null ? args : args[3..]
 // Written by the /setup wizard (AnthoDingo.Setup): Setup:IsComplete, Setup:Provider and
 // ConnectionStrings:DefaultConnection. Machine-specific, never committed. Ranked right after
 // appsettings.{Environment}.json: user secrets, environment variables, the command line and
-// test hosts still override it.
+// test hosts still override it. Setup:LocalConfigFile moves it (Docker: into the App_Data volume).
+var localConfig = builder.Configuration["Setup:LocalConfigFile"] ?? "appsettings.local.json";
 var sources = builder.Configuration.Sources;
 sources.Insert(sources.ToList().FindLastIndex(s => s is JsonConfigurationSource { Path: { } p }
         && p.StartsWith("appsettings", StringComparison.OrdinalIgnoreCase)) + 1,
-    new JsonConfigurationSource { Path = "appsettings.local.json", Optional = true, FileProvider = builder.Environment.ContentRootFileProvider });
+    new JsonConfigurationSource { Path = localConfig, Optional = true, FileProvider = builder.Environment.ContentRootFileProvider });
 
 // Not installed yet: the app is only the wizard. It writes the file above then stops the
 // process, which the host (service manager, container, `dotnet run` again) restarts installed.
 if (!builder.Configuration.GetValue<bool>("Setup:IsComplete"))
 {
-    builder.Services.AddFileBasedSetup<Installer>(DatabaseProviderExtensions.AddSetupDrivers);
+    builder.Services.AddFileBasedSetup<Installer>(o =>
+    {
+        o.LocalConfigFileName = localConfig;
+        DatabaseProviderExtensions.AddSetupDrivers(o);
+    });
     builder.Services.AddSetupStep<CompanySetupStep>();
     var wizard = builder.Build();
     wizard.UseSetupMiddleware("Factos");

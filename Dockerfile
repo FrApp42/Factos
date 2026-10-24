@@ -12,10 +12,10 @@ WORKDIR /app
 COPY --from=build --chown=app:app /app .
 # Everything that must survive the container lives in App_Data (the volume): the SQLite
 # database (wizard default App_Data/app.db), Data Protection keys, logos, and the
-# appsettings.local.json the /setup wizard writes to the content root — hence the symlink.
-RUN mkdir App_Data && chown app:app App_Data \
-    && ln -s App_Data/appsettings.local.json appsettings.local.json
-ENV DataProtection__KeysPath=App_Data/keys \
+# appsettings.local.json the /setup wizard writes (Setup:LocalConfigFile).
+RUN mkdir App_Data && chown app:app App_Data
+ENV Setup__LocalConfigFile=App_Data/appsettings.local.json \
+    DataProtection__KeysPath=App_Data/keys \
     Storage__UploadsPath=App_Data/uploads
 VOLUME /app/App_Data
 USER app
