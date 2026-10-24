@@ -24,6 +24,8 @@
     <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Description")</span><InputTextArea class="form-control" rows="3" @bind-Value="item.Description" /></label></div>
 </div></div>
 
+<CustomFieldInputs Answers="fields" />
+
 <div class="d-flex gap-2">
     <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
     <a class="btn btn-outline-secondary" href="admin/items">@Loc.T("Annuler")</a>
@@ -36,6 +38,7 @@
     private decimal price;
     private List<Unit> units = [];
     private string? error;
+    private List<CustomFieldAnswer> fields = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -44,6 +47,7 @@
         units = await db.Units.Where(u => u.CompanyId == Current.Id).OrderBy(u => u.Name).ToListAsync();
         item = Id is { } id ? await db.Items.SingleAsync(i => i.Id == id && i.CompanyId == Current.Id) : new Item();
         price = Money.ToMajor(item.Price);
+        fields = await CustomFields.LoadAsync(db, Current.Id, "Item", Id);
     }
 
     private async Task Save()
@@ -51,6 +55,11 @@
         if (string.IsNullOrWhiteSpace(item!.Name))
         {
             error = Loc.T("Le nom est obligatoire.");
+            return;
+        }
+        if (CustomFields.Validate(fields, Current.Setting("time_zone")) is { } invalid)
+        {
+            error = invalid;
             return;
         }
         await using var db = Dbs.Create();
@@ -70,6 +79,7 @@
             db.Items.Update(item);
         }
         await db.SaveChangesAsync();
+        await CustomFields.SaveAsync(db, Current.Id, "Item", item.Id, fields);
         Navigation.NavigateTo("admin/items");
     }
 }

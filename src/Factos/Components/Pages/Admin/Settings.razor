@@ -194,6 +194,10 @@
         <TemplateDesigner />
         break;
 
+    case "custom-fields":
+        <CustomFieldSettings />
+        break;
+
     case "appearance":
         <div class="card"><div class="card-body row g-3">
             <p class="col-12 text-muted small m-0">Réglages de l'instance, communs à toutes les sociétés. Chaque utilisateur peut choisir le sien dans Mon profil ; le mode clair ou sombre suit le système.</p>
@@ -317,6 +321,7 @@
     [
         ("company", "Société"), ("preferences", "Préférences"), ("taxes", "Taxes"),
         ("methods", "Moyens de paiement"), ("units", "Unités"), ("categories", "Catégories de dépenses"), ("emails", "E-mails"), ("templates", "Modèles PDF"),
+        ("custom-fields", "Champs personnalisés"),
     ];
 
     /// DateFormatter::$formats, including upstream's leading space on ' YYYY/MM/DD'.

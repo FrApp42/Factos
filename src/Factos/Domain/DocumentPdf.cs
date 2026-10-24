@@ -77,6 +77,8 @@ public static class DocumentPdf
                 c.Item().Text(line);
             if (!string.IsNullOrEmpty(d.Company.VatId))
                 c.Item().Text($"TVA : {d.Company.VatId}");
+            if (!string.IsNullOrEmpty(d.Company.TaxId))
+                c.Item().Text(Loc.F("SIRET : {0}", d.Company.TaxId));
         });
 
         void Meta(IContainer box) => box.Column(c =>
@@ -92,6 +94,8 @@ public static class DocumentPdf
                 c.Item().Text(Loc.F("Réf. : {0}", d.Reference));
             if (!string.IsNullOrEmpty(d.CreditReason))
                 c.Item().Text($"Motif : {d.CreditReason}");
+            foreach (var (label, value) in d.PrintedFields)
+                c.Item().Text($"{label} : {value}");
         });
 
         // The logo travels with the company block; the document details take the other side.

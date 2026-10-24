@@ -71,6 +71,8 @@
     </div>
 }
 
+<CustomFieldInputs Answers="fields" />
+
 <div class="d-flex gap-2">
     <button class="btn btn-primary" disabled="@saving" @onclick="Save">@Loc.T("Enregistrer")</button>
     <a class="btn btn-outline-secondary" href="@(Id is null ? "admin/payments" : $"admin/payments/{Id}/view")">@Loc.T("Annuler")</a>
@@ -99,6 +101,7 @@
     private Currency? currency;
     private string? error;
     private bool saving;
+    private List<CustomFieldAnswer> fields = [];
 
     private long Unallocated => Money.ToCents(amount) - rows.Sum(r => r.Allocated);
 
@@ -110,6 +113,7 @@
         {
             customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
             methods = await db.PaymentMethods.Where(m => m.CompanyId == Current.Id).OrderBy(m => m.Name).ToListAsync();
+            fields = await CustomFields.LoadAsync(db, Current.Id, "Payment", Id);
         }
 
         if (Id is { } id)
@@ -192,7 +196,10 @@
         {
             form!.Amount = Money.ToCents(amount);
             form.Allocations = rows.Where(r => r.Allocated > 0).Select(r => new Allocation { InvoiceId = r.InvoiceId, Amount = r.Allocated }).ToList();
+            if (CustomFields.Validate(fields, Current.Setting("time_zone")) is { } invalid)
+                throw new SalesException(invalid);
             var id = await Sales.SavePaymentAsync(Current.Id, Current.UserId, form);
+            await CustomFields.SaveAsync(Dbs, Current.Id, "Payment", id, fields);
             Navigation.NavigateTo($"admin/payments/{id}/view");
         }
         catch (SalesException ex)

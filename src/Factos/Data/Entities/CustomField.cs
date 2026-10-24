@@ -6,7 +6,7 @@ namespace Factos.Data.Entities;
 
 /// Mirrors InvoiceShelf's `custom_fields` table. Column names are part of the v1 API contract.
 [Table("custom_fields")]
-public class CustomField
+public class CustomField : ICustomFieldAnswer
 {
     public long Id { get; set; }
 

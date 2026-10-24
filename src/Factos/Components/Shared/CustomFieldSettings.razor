@@ -1,0 +1,192 @@
+@* Paramètres › Champs personnalisés: the company's definitions (upstream CustomFieldsController + CustomFieldModal). *@
+@inject AppDbFactory Dbs
+@inject CurrentCompany Current
+@inject IJSRuntime JS
+
+@if (error is not null) { <div class="alert alert-danger">@error</div> }
+
+@if (editing is not null)
+{
+    <div class="card mb-3"><div class="card-body row g-3">
+        <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Modèle *")</span>
+            <select class="form-select" @bind="editing.ModelType">
+                @foreach (var m in CustomFields.Models) { <option value="@m.Key">@Loc.T(m.Label)</option> }
+            </select></label></div>
+        <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Nom *")</span>
+            <input class="form-control" @bind="editing.Name" /></label>
+            @if (editing.Id != 0) { <div class="form-text">@Loc.F("Variable : {0}", "{" + editing.Slug + "}")</div> }</div>
+        <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Libellé *")</span>
+            <input class="form-control" @bind="editing.Label" /></label></div>
+        <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Type *")</span>
+            <select class="form-select" @bind="editing.Type">
+                @foreach (var t in CustomFields.Types) { <option value="@t.Key">@Loc.T(t.Label)</option> }
+            </select></label></div>
+        <div class="col-md-4"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Texte indicatif")</span>
+            <input class="form-control" @bind="editing.Placeholder" /></label></div>
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Ordre *")</span>
+            <input class="form-control" type="number" @bind="editing.Order" /></label></div>
+        <div class="col-md-2"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Affichage")</span>
+            <select class="form-select" @bind="editing.Placement">
+                <option value="@CustomFields.Internal">@Loc.T("Interne")</option>
+                <option value="@CustomFields.Document">@Loc.T("Imprimé")</option>
+            </select></label></div>
+        @if (editing.Type == "Dropdown")
+        {
+            <div class="col-md-6"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Options (une par ligne)")</span>
+                <textarea class="form-control" rows="4" @bind="options"></textarea></label></div>
+        }
+        <div class="col-12 form-check form-switch ms-2">
+            <input class="form-check-input" role="switch" type="checkbox" id="cfRequired" @bind="editing.IsRequired" />
+            <label class="form-check-label" for="cfRequired">@Loc.T("Obligatoire")</label>
+        </div>
+        <CustomFieldInputs Answers="[fallback!]" Bare />
+
+        <h3 class="h6 col-12 mb-0">@Loc.T("Contrôles")</h3>
+        @foreach (var (key, label) in RuleKeys)
+        {
+            <div class="col-md-3"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T(label)</span>
+                <input class="form-control" value="@rules.GetValueOrDefault(key)" @onchange="e => rules[key] = e.Value?.ToString() ?? string.Empty" /></label></div>
+        }
+        <p class="col-12 form-text m-0">@Loc.T("Bornes de date : une date (AAAA-MM-JJ), une heure (HH:MM) ou « today ».")</p>
+
+        <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
+            <button class="btn btn-outline-secondary" @onclick="Cancel">@Loc.T("Annuler")</button>
+        </div>
+    </div></div>
+}
+else
+{
+    <button class="btn btn-primary mb-3" @onclick="() => Edit(null)">@Loc.T("Nouveau champ")</button>
+}
+
+<div class="card"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>@Loc.T("Libellé")</th><th>@Loc.T("Modèle")</th><th>@Loc.T("Type")</th><th>@Loc.T("Variable")</th><th>@Loc.T("Affichage")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var f in fields)
+            {
+                <tr>
+                    <td>@f.Label@(f.IsRequired ? " *" : "")</td>
+                    <td>@Loc.T(CustomFields.Models.FirstOrDefault(m => m.Key == f.ModelType).Label ?? f.ModelType)</td>
+                    <td>@Loc.T(CustomFields.Types.FirstOrDefault(t => t.Key == f.Type).Label ?? f.Type)</td>
+                    <td><code>{@f.Slug}</code></td>
+                    <td>@(f.Placement == CustomFields.Document ? Loc.T("Imprimé") : Loc.T("Interne"))</td>
+                    <td class="text-end text-nowrap">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(f)">@Loc.T("Modifier")</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(f)">@Loc.T("Supprimer")</button>
+                    </td>
+                </tr>
+            }
+            @if (fields.Count == 0) { <tr><td colspan="6" class="text-muted">@Loc.T("Aucun champ personnalisé.")</td></tr> }
+        </tbody>
+    </table>
+</div></div>
+
+@code {
+    private static readonly (string, string)[] RuleKeys =
+    [
+        ("min_length", "Longueur min."), ("max_length", "Longueur max."), ("min", "Valeur min."), ("max", "Valeur max."),
+        ("earliest", "Au plus tôt"), ("latest", "Au plus tard"), ("pattern", "Motif (expression régulière)"),
+    ];
+
+    private List<CustomField> fields = [];
+    private CustomField? editing;
+    private CustomFieldAnswer? fallback;
+    private string options = "";
+    private Dictionary<string, string> rules = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Current.EnsureLoadedAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var db = Dbs.Create();
+        fields = await db.CustomFields.AsNoTracking().Where(f => f.CompanyId == Current.Id)
+            .OrderBy(f => f.ModelType).ThenBy(f => f.Order).ThenBy(f => f.Id).ToListAsync();
+    }
+
+    private void Edit(CustomField? field)
+    {
+        error = null;
+        // Edited in place: Cancel reloads the list.
+        editing = field ?? new CustomField { ModelType = "Customer", Type = "Input", Order = 1, Placement = CustomFields.Internal };
+        fallback = new CustomFieldAnswer { Field = editing, Value = CustomFields.Read(editing) };
+        options = string.Join("\n", CustomFields.Options(editing));
+        rules = CustomFields.Rules(editing);
+    }
+
+    private async Task Cancel()
+    {
+        editing = null;
+        error = null;
+        await Load();
+    }
+
+    private async Task Save()
+    {
+        var f = editing!;
+        f.Name = f.Name.Trim();
+        f.Label = f.Label.Trim();
+        f.Placeholder = string.IsNullOrWhiteSpace(f.Placeholder) ? null : f.Placeholder;
+        var list = options.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToList();
+        f.Options = f.Type == "Dropdown" && list.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(list) : null;
+        f.Validation = CustomFields.SerializeRules(rules);
+        // Checked against the default answer before it is written into the definition's columns.
+        var probe = new CustomFieldAnswer { Field = f, Value = fallback!.Value };
+        var invalid = CustomFields.ValidateDefinition(f)
+            ?? (string.IsNullOrWhiteSpace(probe.Value) ? null : CustomFields.Validate([probe], Current.Setting("time_zone")));
+        if (invalid is not null)
+        {
+            error = invalid;
+            return;
+        }
+        CustomFields.Write(f, fallback.Value);
+
+        await using var db = Dbs.Create();
+        var now = Timestamp.Now();
+        f.UpdatedAt = now;
+        if (f.Id == 0)
+        {
+            var taken = await db.CustomFields.Where(x => x.CompanyId == Current.Id && x.ModelType == f.ModelType).Select(x => x.Slug).ToListAsync();
+            if (CustomFields.Slug(f.ModelType, f.Name, taken) is not { } slug)
+            {
+                error = Loc.T("Trop de champs de ce modèle portent déjà ce nom.");
+                return;
+            }
+            f.Slug = slug;
+            f.CompanyId = Current.Id;
+            f.CreatedAt = now;
+            db.CustomFields.Add(f);
+        }
+        else
+        {
+            if (!await db.CustomFields.AnyAsync(x => x.Id == f.Id && x.CompanyId == Current.Id)) return;
+            db.CustomFields.Update(f);
+        }
+        await db.SaveChangesAsync();
+        editing = null;
+        error = null;
+        await Load();
+    }
+
+    private async Task Delete(CustomField field)
+    {
+        await using var db = Dbs.Create();
+        var used = await db.CustomFieldValues.CountAsync(v => v.CustomFieldId == field.Id);
+        var question = used > 0
+            ? Loc.F("Supprimer le champ « {0} » et ses {1} réponses enregistrées ?", field.Label, used)
+            : Loc.F("Supprimer le champ « {0} » ?", field.Label);
+        if (!await JS.InvokeAsync<bool>("confirm", question))
+            return;
+        if (!await db.CustomFields.AnyAsync(x => x.Id == field.Id && x.CompanyId == Current.Id)) return;
+        await db.CustomFieldValues.Where(v => v.CustomFieldId == field.Id).ExecuteDeleteAsync();
+        await db.CustomFields.Where(x => x.Id == field.Id).ExecuteDeleteAsync();
+        if (editing?.Id == field.Id) editing = null;
+        await Load();
+    }
+}

@@ -189,6 +189,7 @@ public class Sales(AppDbFactory dbs)
         await db.Taxes.Where(t => t.InvoiceId == id || db.InvoiceItems.Any(ii => ii.InvoiceId == id && ii.Id == t.InvoiceItemId)).ExecuteDeleteAsync();
         await db.InvoiceItems.Where(ii => ii.InvoiceId == id).ExecuteDeleteAsync();
         await db.Transactions.Where(t => t.InvoiceId == id).ExecuteDeleteAsync();
+        await CustomFields.DeleteAsync(db, "Invoice", id);
         db.Invoices.Remove(invoice);
         await db.SaveChangesAsync();
         // Removing a credit note gives its amount back to the invoice it credited.
@@ -327,6 +328,7 @@ public class Sales(AppDbFactory dbs)
         var estimate = await db.Estimates.SingleAsync(e => e.Id == id && e.CompanyId == companyId);
         await db.Taxes.Where(t => t.EstimateId == id || db.EstimateItems.Any(ei => ei.EstimateId == id && ei.Id == t.EstimateItemId)).ExecuteDeleteAsync();
         await db.EstimateItems.Where(ei => ei.EstimateId == id).ExecuteDeleteAsync();
+        await CustomFields.DeleteAsync(db, "Estimate", id);
         db.Estimates.Remove(estimate);
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -589,6 +591,7 @@ public class Sales(AppDbFactory dbs)
         var payment = await db.Payments.SingleAsync(p => p.Id == id && p.CompanyId == companyId);
         var invoiceIds = await db.PaymentAllocations.Where(a => a.PaymentId == id).Select(a => a.InvoiceId).ToListAsync();
         await db.PaymentAllocations.Where(a => a.PaymentId == id).ExecuteDeleteAsync();
+        await CustomFields.DeleteAsync(db, "Payment", id);
         db.Payments.Remove(payment);
         await db.SaveChangesAsync();
         foreach (var invoice in await db.Invoices.Where(i => invoiceIds.Contains(i.Id)).ToListAsync())

@@ -6,7 +6,7 @@ namespace Factos.Data.Entities;
 
 /// Mirrors InvoiceShelf's `custom_field_values` table. Column names are part of the v1 API contract.
 [Table("custom_field_values")]
-public class CustomFieldValue
+public class CustomFieldValue : ICustomFieldAnswer
 {
     public long Id { get; set; }
 
@@ -35,4 +35,16 @@ public class CustomFieldValue
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
+}
+
+/// The six typed answer columns a definition (its default) and an answer share.
+public interface ICustomFieldAnswer
+{
+    string Type { get; }
+    bool? BooleanAnswer { get; set; }
+    DateOnly? DateAnswer { get; set; }
+    TimeOnly? TimeAnswer { get; set; }
+    string? StringAnswer { get; set; }
+    long? NumberAnswer { get; set; }
+    DateTime? DateTimeAnswer { get; set; }
 }

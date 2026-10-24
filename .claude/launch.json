@@ -105,6 +105,29 @@
         "--Recurring:Enabled=false"
       ],
       "port": 5226
+    },
+    {
+      "name": "factos-customfields",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Factos",
+        "--launch-profile",
+        "http",
+        "--artifacts-path",
+        "C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/91acddfe-7dd2-4e3c-811c-0169a89f03e9/scratchpad/pv/artifacts",
+        "--",
+        "--urls",
+        "http://localhost:5227",
+        "--Setup:IsComplete=true",
+        "--Setup:Provider=Sqlite",
+        "--ConnectionStrings:DefaultConnection=DataSource=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/91acddfe-7dd2-4e3c-811c-0169a89f03e9/scratchpad/pv/preview.db",
+        "--Storage:UploadsPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/91acddfe-7dd2-4e3c-811c-0169a89f03e9/scratchpad/pv/uploads",
+        "--DataProtection:KeysPath=C:/Users/Janus/AppData/Local/Temp/claude/E--AnthoDingo-Factos/91acddfe-7dd2-4e3c-811c-0169a89f03e9/scratchpad/pv/keys",
+        "--Recurring:Enabled=false"
+      ],
+      "port": 5227
     }
   ]
 }

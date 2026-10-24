@@ -65,7 +65,8 @@ else
         await db.InvoiceItems.Where(x => x.ItemId == item.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ItemId, (int?)null));
         await db.EstimateItems.Where(x => x.ItemId == item.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ItemId, (int?)null));
         await db.Taxes.Where(t => t.ItemId == item.Id).ExecuteDeleteAsync();
-        await db.Items.Where(i => i.Id == item.Id && i.CompanyId == Current.Id).ExecuteDeleteAsync();
+        if (await db.Items.Where(i => i.Id == item.Id && i.CompanyId == Current.Id).ExecuteDeleteAsync() > 0)
+            await CustomFields.DeleteAsync(db, "Item", item.Id);
         await Load();
     }
 }

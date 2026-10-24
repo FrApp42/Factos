@@ -58,7 +58,8 @@ else
             return;
         await using var db = Dbs.Create();
         await db.Taxes.Where(t => t.ExpenseId == expense.Id).ExecuteDeleteAsync();
-        await db.Expenses.Where(e => e.Id == expense.Id && e.CompanyId == Current.Id).ExecuteDeleteAsync();
+        if (await db.Expenses.Where(e => e.Id == expense.Id && e.CompanyId == Current.Id).ExecuteDeleteAsync() > 0)
+            await CustomFields.DeleteAsync(db, "Expense", expense.Id);
         await Load();
     }
 }

@@ -9,6 +9,7 @@
             <div class="fs-4 fw-bold">@D.Company.Name</div>
             @foreach (var line in DocumentData.Lines(D.CompanyAddress, D.CompanyCountry)) { <div class="small">@line</div> }
             @if (!string.IsNullOrEmpty(D.Company.VatId)) { <div class="small">@Loc.F("TVA : {0}", D.Company.VatId)</div> }
+            @if (!string.IsNullOrEmpty(D.Company.TaxId)) { <div class="small">@Loc.F("SIRET : {0}", D.Company.TaxId)</div> }
         </div>
         <div class="text-end">
             <div class="fs-3 text-uppercase text-muted">@D.Title</div>
@@ -18,6 +19,7 @@
             @if (D.IsCreditNote) { <div><strong>@Loc.T("Avoir sur la facture :")</strong> @D.RelatedNumber</div> }
             else if (!string.IsNullOrEmpty(D.Reference)) { <div><strong>@Loc.T("Réf. :")</strong> @D.Reference</div> }
             @if (!string.IsNullOrEmpty(D.CreditReason)) { <div><strong>@Loc.T("Motif :")</strong> @D.CreditReason</div> }
+            @foreach (var (label, value) in D.PrintedFields) { <div><strong>@label :</strong> @value</div> }
         </div>
     </div>
 

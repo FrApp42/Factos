@@ -44,6 +44,8 @@
     <div class="col-12"><label class="d-block mb-0"><span class="form-label d-block">@Loc.T("Notes")</span><InputTextArea class="form-control" rows="3" @bind-Value="expense.Notes" /></label></div>
 </div></div>
 
+<CustomFieldInputs Answers="fields" />
+
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
     @if (Id is not null) { <button class="btn btn-outline-primary" @onclick="ToggleSend">@Loc.T("Envoyer par e-mail")</button> }
@@ -65,6 +67,7 @@
     private List<PaymentMethod> methods = [];
     private string? error;
     private DocumentData? sendData;
+    private List<CustomFieldAnswer> fields = [];
 
     // Sends the saved expense: unsaved edits are not part of the e-mail.
     private async Task ToggleSend()
@@ -81,6 +84,7 @@
             ? await db.Expenses.SingleAsync(e => e.Id == id && e.CompanyId == Current.Id)
             : new Expense { ExpenseDate = DateOnly.FromDateTime(DateTime.Today), ExpenseCategoryId = categories.FirstOrDefault()?.Id ?? 0 };
         amount = Money.ToMajor(expense.Amount);
+        fields = await CustomFields.LoadAsync(db, Current.Id, "Expense", Id);
     }
 
     private async Task Save()
@@ -93,6 +97,11 @@
         if (amount <= 0)
         {
             error = Loc.T("Le montant doit être positif.");
+            return;
+        }
+        if (CustomFields.Validate(fields, Current.Setting("time_zone")) is { } invalid)
+        {
+            error = invalid;
             return;
         }
         await using var db = Dbs.Create();
@@ -115,6 +124,7 @@
             db.Expenses.Update(expense);
         }
         await db.SaveChangesAsync();
+        await CustomFields.SaveAsync(db, Current.Id, "Expense", expense.Id, fields);
         Navigation.NavigateTo("admin/expenses");
     }
 }

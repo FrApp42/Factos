@@ -82,7 +82,8 @@ else
         await db.Addresses.Where(a => a.CustomerId == id).ExecuteDeleteAsync();
         var mailOption = DocumentMailer.CustomerOption(id);
         await db.CompanySettings.Where(s => s.CompanyId == Current.Id && s.Option == mailOption).ExecuteDeleteAsync();
-        await db.Customers.Where(c => c.Id == id && c.CompanyId == Current.Id).ExecuteDeleteAsync();
+        if (await db.Customers.Where(c => c.Id == id && c.CompanyId == Current.Id).ExecuteDeleteAsync() > 0)
+            await CustomFields.DeleteAsync(db, "Customer", id);
         error = null;
         await Load();
     }

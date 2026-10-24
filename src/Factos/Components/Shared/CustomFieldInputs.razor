@@ -1,0 +1,65 @@
+@* Inputs for one record's custom-field answers (CustomFields.LoadAsync); nothing when the company has none. *@
+
+@if (Bare)
+{
+    @Inputs
+}
+else if (Answers.Count > 0)
+{
+    <h2 class="h5">@Loc.T("Champs personnalisés")</h2>
+    <div class="card mb-3"><div class="card-body row g-3">@Inputs</div></div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<CustomFieldAnswer> Answers { get; set; } = [];
+    /// Columns only, inside the caller's own row (the settings form's default answer).
+    [Parameter] public bool Bare { get; set; }
+
+    private RenderFragment Inputs => @<text>
+        @foreach (var a in Answers)
+        {
+            var f = a.Field;
+            var label = Bare ? Loc.T("Valeur par défaut") : f.Label + (f.IsRequired ? " *" : "");
+            <div class="@(f.Type == "TextArea" ? "col-12" : "col-md-4")">
+                @if (f.Type == "Switch")
+                {
+                    <div class="form-check form-switch mt-md-4">
+                        <input class="form-check-input" role="switch" type="checkbox" id="cf-@f.Id" @bind="a.Checked" />
+                        <label class="form-check-label" for="cf-@f.Id">@label</label>
+                    </div>
+                }
+                else
+                {
+                    <label class="d-block mb-0"><span class="form-label d-block">@label</span>
+                    @switch (f.Type)
+                    {
+                        case "TextArea":
+                            <textarea class="form-control" rows="3" placeholder="@f.Placeholder" @bind="a.Value"></textarea>
+                            break;
+                        case "Dropdown":
+                            <select class="form-select" @bind="a.Value">
+                                <option value="">—</option>
+                                @foreach (var o in CustomFields.Options(f)) { <option value="@o">@o</option> }
+                            </select>
+                            break;
+                        default:
+                            <input class="form-control" type="@InputType(f.Type)" placeholder="@f.Placeholder" @bind="a.Value" />
+                            break;
+                    }
+                    </label>
+                }
+            </div>
+        }
+    </text>;
+
+    private static string InputType(string type) => type switch
+    {
+        "Number" => "number",
+        "Phone" => "tel",
+        "Url" => "url",
+        "Date" => "date",
+        "Time" => "time",
+        "DateTime" => "datetime-local",
+        _ => "text",
+    };
+}

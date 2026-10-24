@@ -63,6 +63,11 @@ public sealed class DocumentData
     // Expenses (Factos-only: upstream does not mail them).
     public string? Category { get; init; }
 
+    /// Custom fields marked `placement = document`, printed beside the number and dates.
+    public List<(string Label, string Value)> PrintedFields { get; private set; } = [];
+    /// `{CUSTOM_…}` tokens from the document's and the customer's answers.
+    public Dictionary<string, string?> CustomPlaceholders { get; private set; } = [];
+
     /// Invoices and estimates have item lines and totals; receipts and expenses one amount.
     public bool HasLines => Kind is Invoice or Estimate;
 
@@ -141,6 +146,8 @@ public sealed class DocumentData
                 fields["{PAYMENT_AMOUNT}"] = Money(Amount);
                 break;
         }
+        foreach (var (token, value) in CustomPlaceholders)
+            fields[token] = value;
         return fields;
     }
 
@@ -156,6 +163,17 @@ public sealed class DocumentData
     // ---- loading ------------------------------------------------------------------------
 
     public static async Task<DocumentData?> LoadAsync(AppDbFactory dbs, Sales sales, string kind, long id, int? companyId = null)
+    {
+        var data = await LoadCoreAsync(dbs, sales, kind, id, companyId);
+        if (data is null) return null;
+        await using var db = dbs.Create();
+        var model = char.ToUpperInvariant(kind[0]) + kind[1..];
+        data.PrintedFields = await CustomFields.PrintedAsync(db, data.Company.Id, model, id, data.Settings.GetValueOrDefault("carbon_date_format", "Y/m/d"));
+        data.CustomPlaceholders = await CustomFields.PlaceholdersAsync(db, (model, id), ("Customer", data.Customer.Id));
+        return data;
+    }
+
+    private static async Task<DocumentData?> LoadCoreAsync(AppDbFactory dbs, Sales sales, string kind, long id, int? companyId)
     {
         await using var db = dbs.Create();
         int docCompany;

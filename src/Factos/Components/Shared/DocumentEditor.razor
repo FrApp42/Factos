@@ -69,6 +69,8 @@
         <InputTextArea class="form-control" rows="5" @bind-Value="form.Notes" /></label>
 </DocumentLines>
 
+<CustomFieldInputs Answers="fields" />
+
 <div class="d-flex gap-2">
     <button class="btn btn-primary" disabled="@saving" @onclick="Save">@Loc.T("Enregistrer")</button>
     <a class="btn btn-outline-secondary" href="@ListUrl">@Loc.T("Annuler")</a>
@@ -81,6 +83,8 @@
     [Parameter] public long? CustomerId { get; set; }
 
     private bool IsInvoice => Kind == "invoice";
+    private string Model => IsInvoice ? "Invoice" : "Estimate";
+    private List<CustomFieldAnswer> fields = [];
     private string ListUrl => IsInvoice ? "admin/invoices" : "admin/estimates";
 
     private DocumentForm? form;
@@ -101,6 +105,7 @@
             customers = await db.Customers.Where(c => c.CompanyId == Current.Id).OrderBy(c => c.Name).ToListAsync();
             items = await db.Items.Where(i => i.CompanyId == Current.Id).OrderBy(i => i.Name).ToListAsync();
             taxTypes = await db.TaxTypes.Where(t => t.CompanyId == Current.Id && t.TransactionType == "sales").OrderBy(t => t.Name).ToListAsync();
+            fields = await CustomFields.LoadAsync(db, Current.Id, Model, Id);
         }
 
         templates = await DocumentTemplates.LoadAsync(Dbs, Current.Id);
@@ -149,9 +154,12 @@
         try
         {
             Recalc();
+            if (CustomFields.Validate(fields, Current.Setting("time_zone")) is { } invalid)
+                throw new SalesException(invalid);
             var id = IsInvoice
                 ? await Sales.SaveInvoiceAsync(Current.Id, Current.UserId, form!)
                 : await Sales.SaveEstimateAsync(Current.Id, Current.UserId, form!);
+            await CustomFields.SaveAsync(Dbs, Current.Id, Model, id, fields);
             Navigation.NavigateTo($"{ListUrl}/{id}/view");
         }
         catch (SalesException ex)
