@@ -18,12 +18,14 @@
     return;
 }
 
-<ul class="nav nav-tabs mb-3">
+<div class="d-flex flex-column flex-md-row gap-3">
+<ul class="nav nav-pills flex-md-column flex-shrink-0 align-self-start settings-tabs">
     @foreach (var (key, label) in isSuperAdmin ? [.. Tabs, ("appearance", "Apparence"), ("import", Loc.T("Import InvoiceShelf")), ("updates", Loc.T("Mises à jour"))] : Tabs)
     {
         <li class="nav-item"><button class="nav-link @(tab == key ? "active" : "")" @onclick="() => Select(key)">@Loc.T(label)</button></li>
     }
 </ul>
+<div class="flex-grow-1" style="min-width:0">
 
 @if (message is not null) { <div class="alert alert-success">@message</div> }
 @if (error is not null) { <div class="alert alert-danger">@error</div> }
@@ -315,6 +317,8 @@
         </div>
         break;
 }
+</div>
+</div>
 
 @code {
     private static readonly (string, string)[] Tabs =
