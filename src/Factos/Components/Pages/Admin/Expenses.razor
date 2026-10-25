@@ -2,6 +2,7 @@
 @inject AppDbFactory Dbs
 @inject CurrentCompany Current
 @inject IJSRuntime JS
+@inject ExpenseFiles Files
 
 <PageTitle>@Loc.T("Dépenses · Factos")</PageTitle>
 
@@ -59,7 +60,10 @@ else
         await using var db = Dbs.Create();
         await db.Taxes.Where(t => t.ExpenseId == expense.Id).ExecuteDeleteAsync();
         if (await db.Expenses.Where(e => e.Id == expense.Id && e.CompanyId == Current.Id).ExecuteDeleteAsync() > 0)
+        {
             await CustomFields.DeleteAsync(db, "Expense", expense.Id);
+            Files.RemoveAll(expense.Id);
+        }
         await Load();
     }
 }

@@ -4,6 +4,7 @@
 @inject CurrentCompany Current
 @inject NavigationManager Navigation
 @inject Sales Sales
+@inject ExpenseFiles Files
 
 <PageTitle>@Loc.T("Dépense · Factos")</PageTitle>
 
@@ -46,6 +47,30 @@
 
 <CustomFieldInputs Answers="fields" />
 
+<div class="card mb-3"><div class="card-body">
+    <span class="form-label d-block">@Loc.T("Pièces jointes")</span>
+    <div class="dropzone">
+        <span>@Loc.T("Glissez-déposez des fichiers ici ou cliquez pour parcourir (10 Mo max chacun)")</span>
+        <InputFile multiple OnChange="Pick" aria-label="@Loc.T("Pièces jointes")" />
+    </div>
+    <ul class="list-unstyled mt-2 mb-0">
+        @foreach (var f in saved)
+        {
+            <li class="d-flex gap-2 align-items-center">
+                <a href="expenses/files/@Id/@Uri.EscapeDataString(f.Name)">@f.Name</a> <small class="text-muted">@(f.Size / 1024) Ko</small>
+                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSaved(f.Name)">@Loc.T("Supprimer")</button>
+            </li>
+        }
+        @foreach (var f in pending)
+        {
+            <li class="d-flex gap-2 align-items-center">
+                <span>@f.Name</span> <small class="text-muted">@(f.Content.Length / 1024) Ko — @Loc.T("à enregistrer")</small>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => pending.Remove(f)">@Loc.T("Retirer")</button>
+            </li>
+        }
+    </ul>
+</div></div>
+
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-primary" @onclick="Save">@Loc.T("Enregistrer")</button>
     @if (Id is not null) { <button class="btn btn-outline-primary" @onclick="ToggleSend">@Loc.T("Envoyer par e-mail")</button> }
@@ -68,6 +93,29 @@
     private string? error;
     private DocumentData? sendData;
     private List<CustomFieldAnswer> fields = [];
+    private List<(string Name, long Size)> saved = [];
+    private readonly List<(string Name, byte[] Content)> pending = [];
+
+    private async Task Pick(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (file.Size > ExpenseFiles.MaxBytes)
+            {
+                error = Loc.F("« {0} » dépasse 10 Mo.", file.Name);
+                continue;
+            }
+            using var buffer = new MemoryStream();
+            await file.OpenReadStream(ExpenseFiles.MaxBytes).CopyToAsync(buffer);
+            pending.Add((file.Name, buffer.ToArray()));
+        }
+    }
+
+    private void RemoveSaved(string name)
+    {
+        Files.Remove(Id!.Value, name);
+        saved = Files.List(Id!.Value);
+    }
 
     // Sends the saved expense: unsaved edits are not part of the e-mail.
     private async Task ToggleSend()
@@ -85,6 +133,8 @@
             : new Expense { ExpenseDate = DateOnly.FromDateTime(DateTime.Today), ExpenseCategoryId = categories.FirstOrDefault()?.Id ?? 0 };
         amount = Money.ToMajor(expense.Amount);
         fields = await CustomFields.LoadAsync(db, Current.Id, "Expense", Id);
+        if (Id is { } existing)
+            saved = Files.List(existing);
     }
 
     private async Task Save()
@@ -125,6 +175,8 @@
         }
         await db.SaveChangesAsync();
         await CustomFields.SaveAsync(db, Current.Id, "Expense", expense.Id, fields);
+        foreach (var (name, content) in pending)
+            await Files.SaveAsync(expense.Id, name, content);
         Navigation.NavigateTo("admin/expenses");
     }
 }

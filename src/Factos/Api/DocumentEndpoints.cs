@@ -63,6 +63,18 @@ public static class DocumentEndpoints
             return logos.Read(file) is { } bytes ? Results.File(bytes, Logos.ContentType(file!)) : Results.NotFound();
         });
 
+        // Factos-only expense attachments: members of the expense's company only, always a download.
+        app.MapGet("/expenses/files/{id:long}/{name}", async (long id, string name, ClaimsPrincipal user, AppDbFactory dbs, ExpenseFiles files) =>
+        {
+            await using var db = dbs.Create();
+            var companyId = await db.Expenses.Where(e => e.Id == id).Select(e => (int?)e.CompanyId).FirstOrDefaultAsync();
+            var userId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (companyId is null || !await db.UserCompanies.AnyAsync(uc => uc.UserId == userId && uc.CompanyId == companyId))
+                return Results.NotFound();
+            return files.Find(id, name) is { } path ? Results.File(File.OpenRead(path), "application/octet-stream", fileDownloadName: name) : Results.NotFound();
+        })
+        .RequireAuthorization(signedIn);
+
         // Factos-only mail tracking pixel (`mail_tracking`): the first load stamps opened_at.
         app.MapGet("/customer/mails/{token}/open.gif", async (string token, HttpResponse response, AppDbFactory dbs) =>
         {

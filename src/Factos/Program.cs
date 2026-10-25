@@ -109,6 +109,7 @@ builder.Services.AddSingleton<CreditNotes>();
 builder.Services.AddSingleton<Purchases>();
 builder.Services.AddSingleton<Recurring>();
 builder.Services.AddSingleton<Logos>();
+builder.Services.AddSingleton<ExpenseFiles>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<Mailer>();
 builder.Services.AddSingleton<PasswordResets>();
