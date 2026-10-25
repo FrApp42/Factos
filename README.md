@@ -33,7 +33,7 @@ A clone of [InvoiceShelf](https://github.com/InvoiceShelf/InvoiceShelf) rewritte
 - [ ] **Mobile app**: iOS and Android, .NET MAUI Blazor Hybrid, talking to the `/api/v1` API (separate repository).
 - [ ] **Plugin management**: hot-installable extensions (v2).
 - [ ] **Automatic backup module**: database and files (logos, uploads).
-- [ ] **Two-factor authentication (2FA)**: TOTP codes with recovery codes.
+- [X] **Two-factor authentication (2FA)**: TOTP codes with recovery codes.
 - [ ] **Passkey authentication**: passwordless sign-in (WebAuthn).
 
 ## Quick start
