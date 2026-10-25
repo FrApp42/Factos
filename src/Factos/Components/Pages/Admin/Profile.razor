@@ -9,6 +9,7 @@
 @inject SignInManager<ApplicationUser> SignIn
 @inject AppDbFactory Dbs
 @inject NavigationManager Navigation
+@using QRCoder
 
 <PageTitle>@Loc.T("Mon profil · Factos")</PageTitle>
 
@@ -72,6 +73,36 @@
             </EditForm>
         </div></div>
     </div>
+    <div class="col-lg-6">
+        <div class="card"><div class="card-body">
+            <h2 class="h6 mb-3">@Loc.T("Authentification à deux facteurs")</h2>
+            @if (recoveryCodes is not null)
+            {
+                <div class="alert alert-warning">@Loc.T("Conservez ces codes de récupération : chacun ne sert qu'une fois et ils ne seront plus affichés.")</div>
+                <pre class="mb-0">@string.Join("\n", recoveryCodes)</pre>
+            }
+            else if (user.TwoFactorEnabled)
+            {
+                <p>@Loc.T("Activée : un code de votre application d'authentification est demandé à chaque connexion.")</p>
+                <EditForm Model="DisableInput" FormName="twofa-disable" method="post" OnSubmit="DisableTwoFactor">
+                    <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Mot de passe")</span>
+                        <InputText class="form-control" type="password" @bind-Value="DisableInput.Password" autocomplete="current-password" /></label>
+                    <button class="btn btn-outline-danger" type="submit">@Loc.T("Désactiver")</button>
+                </EditForm>
+            }
+            else
+            {
+                <p class="small text-muted">@Loc.T("Scannez le QR code avec une application d'authentification (Google Authenticator, Aegis, 1Password…), puis saisissez le code affiché.")</p>
+                <div class="mb-2" style="max-width:200px">@((MarkupString)qrSvg)</div>
+                <p class="small">@Loc.T("Ou saisissez la clé :") <code>@sharedKey</code></p>
+                <EditForm Model="EnableInput" FormName="twofa-enable" method="post" OnSubmit="EnableTwoFactor">
+                    <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Code de vérification")</span>
+                        <InputText class="form-control" @bind-Value="EnableInput.Code" autocomplete="one-time-code" inputmode="numeric" /></label>
+                    <button class="btn btn-primary" type="submit">@Loc.T("Activer")</button>
+                </EditForm>
+            }
+        </div></div>
+    </div>
 </div>
 
 @code {
@@ -80,12 +111,16 @@
     [SupplyParameterFromForm(FormName = "profile")] private ProfileModel ProfileInput { get; set; } = default!;
     [SupplyParameterFromForm(FormName = "password")] private PasswordModel PasswordInput { get; set; } = default!;
     [SupplyParameterFromForm(FormName = "theme")] private ThemeModel ThemeInput { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "twofa-enable")] private TwoFactorEnableModel EnableInput { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "twofa-disable")] private TwoFactorDisableModel DisableInput { get; set; } = default!;
     [SupplyParameterFromQuery] private string? Saved { get; set; }
 
     private string defaultTheme = Themes.Fallback;
 
     private ApplicationUser user = default!;
     private string? message, error;
+    private string sharedKey = "", qrSvg = "";
+    private IEnumerable<string>? recoveryCodes;
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,6 +128,10 @@
             ?? throw new InvalidOperationException("Utilisateur introuvable.");
         ProfileInput ??= new ProfileModel { Name = user.Name, Email = user.Email ?? "" };
         PasswordInput ??= new PasswordModel();
+        EnableInput ??= new TwoFactorEnableModel();
+        DisableInput ??= new TwoFactorDisableModel();
+        if (!user.TwoFactorEnabled)
+            await LoadAuthenticatorAsync();
         await using var db = Dbs.Create();
         defaultTheme = Themes.Valid(await Themes.GlobalAsync(db, Themes.DefaultOption));
         ThemeInput ??= new ThemeModel
@@ -101,6 +140,50 @@
         };
         if (Saved == "theme")
             message = Loc.T("Thème appliqué.");
+    }
+
+    // The key persists across visits until the factor is enabled, so the QR code stays valid on reload.
+    private async Task LoadAuthenticatorAsync()
+    {
+        var key = await Users.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await Users.ResetAuthenticatorKeyAsync(user);
+            key = await Users.GetAuthenticatorKeyAsync(user);
+        }
+        sharedKey = string.Join(' ', key!.Chunk(4).Select(c => new string(c).ToLowerInvariant()));
+        var uri = $"otpauth://totp/Factos:{Uri.EscapeDataString(user.Email ?? "")}?secret={key}&issuer=Factos&digits=6";
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
+        qrSvg = new SvgQRCode(data).GetGraphic(4);
+    }
+
+    private async Task EnableTwoFactor()
+    {
+        var code = EnableInput.Code.Replace(" ", "");
+        EnableInput = new TwoFactorEnableModel();
+        if (!await Users.VerifyTwoFactorTokenAsync(user, Users.Options.Tokens.AuthenticatorTokenProvider, code))
+        {
+            error = Loc.T("Code invalide.");
+            return;
+        }
+        await Users.SetTwoFactorEnabledAsync(user, true);
+        recoveryCodes = await Users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+    }
+
+    private async Task DisableTwoFactor()
+    {
+        var password = DisableInput.Password;
+        DisableInput = new TwoFactorDisableModel();
+        if (!await Users.CheckPasswordAsync(user, password))
+        {
+            error = Loc.T("Le mot de passe actuel est incorrect.");
+            return;
+        }
+        await Users.SetTwoFactorEnabledAsync(user, false);
+        await Users.ResetAuthenticatorKeyAsync(user);
+        await LoadAuthenticatorAsync();
+        message = Loc.T("Authentification à deux facteurs désactivée.");
     }
 
     private static string Label(string key) => Loc.T(Themes.All.First(t => t.Key == key).Label);
@@ -172,6 +255,9 @@
         [LocEmail(ErrorMessage = "E-mail invalide.")]
         public string Email { get; set; } = "";
     }
+
+    private sealed class TwoFactorEnableModel { public string Code { get; set; } = ""; }
+    private sealed class TwoFactorDisableModel { public string Password { get; set; } = ""; }
 
     private sealed class ThemeModel
     {

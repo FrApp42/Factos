@@ -1,0 +1,68 @@
+@page "/Account/LoginWith2fa"
+@layout Factos.Components.Layout.AuthLayout
+
+@using Microsoft.AspNetCore.Identity
+@using Factos.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>@Loc.T("Vérification en deux étapes · Factos")</PageTitle>
+
+<h1 class="h4 mb-3 text-center">@Loc.T("Vérification en deux étapes")</h1>
+<p class="text-muted small">@Loc.T("Saisissez le code à 6 chiffres de votre application d'authentification, ou l'un de vos codes de récupération.")</p>
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+<EditForm Model="Input" method="post" OnValidSubmit="Verify" FormName="login-2fa">
+    <DataAnnotationsValidator />
+    <label class="d-block mb-3"><span class="form-label d-block">@Loc.T("Code")</span>
+        <InputText @bind-Value="Input.Code" class="form-control" autocomplete="one-time-code" inputmode="numeric" autofocus /></label>
+    <ValidationMessage For="() => Input.Code" class="text-danger" />
+    <div class="form-check form-switch mb-3">
+        <InputCheckbox @bind-Value="Input.RememberMachine" id="Input.RememberMachine" class="form-check-input" role="switch" />
+        <label class="form-check-label" for="Input.RememberMachine">@Loc.T("Ne plus demander sur cet appareil")</label>
+    </div>
+    <button type="submit" class="w-100 btn btn-primary">@Loc.T("Valider")</button>
+</EditForm>
+<div class="mt-3 text-center small"><a href="Account/Login">@Loc.T("Retour à la connexion")</a></div>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] private bool RememberMe { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Only reachable between the password step and this one.
+        if (await SignInManager.GetTwoFactorAuthenticationUserAsync() is null)
+            RedirectManager.RedirectTo("Account/Login");
+    }
+
+    private async Task Verify()
+    {
+        var code = Input.Code.Replace(" ", "");
+        var isTotp = code.Length == 6 && code.All(char.IsAsciiDigit);
+        // Identity counts failures towards lockout: a 6-digit code is otherwise guessable.
+        var result = isTotp
+            ? await SignInManager.TwoFactorAuthenticatorSignInAsync(code, RememberMe, Input.RememberMachine)
+            : await SignInManager.TwoFactorRecoveryCodeSignInAsync(code);
+
+        if (result.Succeeded)
+            RedirectManager.RedirectTo(ReturnUrl);
+        else if (result.IsLockedOut)
+            RedirectManager.RedirectTo("Account/Lockout");
+        else
+            errorMessage = Loc.T("Code invalide.");
+    }
+
+    private sealed class InputModel
+    {
+        [LocRequired(ErrorMessage = "Le code est obligatoire.")]
+        public string Code { get; set; } = "";
+        public bool RememberMachine { get; set; }
+    }
+}

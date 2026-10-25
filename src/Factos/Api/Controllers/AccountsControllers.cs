@@ -60,7 +60,7 @@ public class AuthController(ApplicationDbContext db, UserManager<ApplicationUser
 {
     private const string Rejected = "The provided credentials are incorrect.";
 
-    public record LoginInput(string? Username, string? Password, string? DeviceName, string? InvitationToken);
+    public record LoginInput(string? Username, string? Password, string? DeviceName, string? InvitationToken, string? TwoFactorCode);
 
     [HttpPost("login")]
     [EnableRateLimiting(RateLimits.Login)]
@@ -78,6 +78,19 @@ public class AuthController(ApplicationDbContext db, UserManager<ApplicationUser
         var staff = await db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == username);
         if (staff is null || !await users.CheckPasswordAsync(staff, input.Password!))
             return new LaravelValidator().Add("email", Rejected).Result();
+
+        // Factos-only: an account with TOTP enabled also needs `two_factor_code` (a code or a
+        // recovery code), otherwise the API would be a way around the second factor.
+        if (staff.TwoFactorEnabled)
+        {
+            var code = (input.TwoFactorCode ?? "").Replace(" ", "");
+            if (code.Length == 0)
+                return new LaravelValidator().Add("two_factor_code", "The two factor code field is required.").Result();
+            var valid = await users.VerifyTwoFactorTokenAsync(staff, users.Options.Tokens.AuthenticatorTokenProvider, code)
+                || (await users.RedeemTwoFactorRecoveryCodeAsync(staff, code)).Succeeded;
+            if (!valid)
+                return new LaravelValidator().Add("two_factor_code", "The two factor code is incorrect.").Result();
+        }
 
         // ponytail: upstream also redeems a pending `invitation_token` here; company
         // invitations are not modelled yet, and upstream ignores unknown tokens silently.

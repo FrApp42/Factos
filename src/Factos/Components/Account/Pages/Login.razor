@@ -76,6 +76,10 @@
             Logger.LogInformation("User logged in.");
             RedirectManager.RedirectTo(ReturnUrl);
         }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo($"Account/LoginWith2fa?rememberMe={Input.RememberMe}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}");
+        }
         else if (result.IsLockedOut)
         {
             Logger.LogWarning("User account locked out.");
